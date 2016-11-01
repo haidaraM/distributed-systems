@@ -91,7 +91,6 @@ ENV/
 # Latex files
 *.aux
 *.lof
-*.log
 *.lot
 *.fls
 *.out
@@ -102,3 +101,4 @@ ENV/
 *.cb2
 *.tex.bak
 *.synctex.gz
+.idea
