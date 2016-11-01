@@ -6,6 +6,8 @@
 # Google's Python Class
 # http://code.google.com/edu/languages/google-python-class/
 
+from __future__ import print_function
+
 """Wordcount exercise
 Google's Python class
 
@@ -77,7 +79,7 @@ def print_words(filename):
     count_dict = read_file(filename)
 
     for key in sorted(count_dict.keys()):
-        print key, count_dict[key]
+        print(key, count_dict[key])
 
 
 def print_top(filename):
@@ -95,7 +97,7 @@ def print_top(filename):
     most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]  # sorts by value and takes the first 20
 
     for word in most_commons_words:
-        print word[0], word[-1]
+        print(word[0], word[-1])
 
 
 ###
