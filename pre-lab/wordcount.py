@@ -55,11 +55,12 @@ def read_file(filename):
     count_dict = {}
     with open(filename, "r") as filecontent:
         for line in filecontent:
-            words = line.lower().split()
+            words = line.lower().split()  # split by whitespace
             for word in words:
-                if word in count_dict:
+
+                if word in count_dict:  # the word is present in the dict, so we just increment the old counter
                     count_dict[word] += 1
-                else:
+                else:  # first time we see the word
                     count_dict[word] = 1
 
     return count_dict
@@ -89,9 +90,9 @@ def print_top(filename):
     """
     count_dict = read_file(filename)
 
-    items = count_dict.items()
+    items = count_dict.items()  # returns a list of (key, value)
 
-    most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]
+    most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]  # sorts by value and takes the first 20
 
     for word in most_commons_words:
         print word[0], word[-1]
