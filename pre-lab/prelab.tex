@@ -1,0 +1,46 @@
+\documentclass[12pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{todonotes}
+\usepackage{pdfpages}
+\usepackage{subcaption} % pour aligner les figures 
+\usepackage{mathtools,amssymb,amsthm}% packages de l'AMS + mathtools
+\usepackage{geometry} % pour les marges et tout ça
+
+\geometry{
+margin=0.9in }
+
+\usepackage{ulem} % pour barrer un mot
+\usepackage{tikz} % pour dessiner des schemas
+
+% pour changer la numérotaiton des sections : http://tex.stackexchange.com/questions/3177/how-to-change-the-numbering-of-part-chapter-section-to-alphabetical-r
+\renewcommand\thesection{\Roman{section}}
+\renewcommand\thesubsection{\thesection.\arabic{subsection}}
+\renewcommand\thesubsubsection{\thesubsection.\alph{subsubsection}}
+
+\newcommand{\exercisenumber}{x}
+
+\usepackage[unicode=true]{hyperref}
+\hypersetup{breaklinks=true,
+            pdfauthor={Mohamed El Mouctar HAIDARA},
+            pdftitle={Exercises from week \exercisenumber{}},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=black}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+
+
+\begin{document}
+\title{Pre-assignment}
+\author{Mohamed El Mouctar HAIDARA \href{mailto:mouctar@student.chalmers.se}{mouctar@student.chalmers.se}}
+
+\maketitle
+\tableofcontents
+\section{Exercise 1}
+\end{document}
