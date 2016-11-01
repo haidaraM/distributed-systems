@@ -8,6 +8,8 @@
 
 from __future__ import print_function
 
+import sys
+
 """Wordcount exercise
 Google's Python class
 
@@ -39,8 +41,6 @@ print_words() and print_top().
 
 """
 
-import sys
-
 
 # +++your code here+++
 # Define print_words(filename) and print_top(filename) functions.
@@ -55,12 +55,14 @@ def read_file(filename):
     :return: word/count dict
     """
     count_dict = {}
-    with open(filename, "r") as filecontent:
+    with open(filename, "rU") as filecontent:
         for line in filecontent:
             words = line.lower().split()  # split by whitespace
             for word in words:
 
-                if word in count_dict:  # the word is present in the dict, so we just increment the old counter
+                if word in count_dict:
+                    # the word is present in the dict, so we just increment the
+                    # old counter
                     count_dict[word] += 1
                 else:  # first time we see the word
                     count_dict[word] = 1
@@ -92,9 +94,10 @@ def print_top(filename):
     """
     count_dict = read_file(filename)
 
-    items = count_dict.items()  # returns a list of (key, value)
+    items = count_dict.items()  # returns a list of (key, value) tuples
 
-    most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]  # sorts by value and takes the first 20
+    # sorts by value and takes the first 20
+    most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]
 
     for word in most_commons_words:
         print(word[0], word[-1])
@@ -116,7 +119,7 @@ def main():
     elif option == '--topcount':
         print_top(filename)
     else:
-        print ('unknown option: ' + option)
+        print('unknown option: ' + option)
         sys.exit(1)
 
 

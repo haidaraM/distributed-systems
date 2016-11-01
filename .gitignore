@@ -101,4 +101,8 @@ ENV/
 *.cb2
 *.tex.bak
 *.synctex.gz
+
+# misc
 .idea
+.vscode
+keys.json
