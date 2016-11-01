@@ -1,0 +1,165 @@
+# send a probe message to each neighbor
+def probe_neighbors(port):
+
+  for neighborip in mycontext["neighborlist"]:
+    mycontext['sendtime'][neighborip] = getruntime()
+    sendmess(neighborip, port, 'ping',getmyip(),port)
+
+    sendmess(neighborip, port,'share'+encode_row(getmyip(), mycontext["neighborlist"], mycontext['latency'].copy()))
+    # sleep in between messages to prevent us from getting a huge number of 
+    # responses all at once...
+    sleep(.5)
+
+  # Call me again in 10 seconds
+  while True:
+    try:
+      settimer(10,probe_neighbors,(port,))
+      return
+    except Exception, e:
+      if "Resource 'events'" in str(e):
+        # there are too many events scheduled, I should wait and try again
+        sleep(.5)
+        continue
+      raise
+  
+
+
+# Handle an incoming message
+def got_message(srcip,srcport,mess,ch):
+  if mess == 'ping':
+    sendmess(srcip,srcport,'pong')
+  elif mess == 'pong':
+    # elapsed time is now - time when I sent the ping
+    mycontext['latency'][srcip] = getruntime() - mycontext['sendtime'][srcip]
+
+  elif mess.startswith('share'):
+    mycontext['row'][srcip] = mess[len('share'):]
+
+
+
+def encode_row(rowip, neighborlist, latencylist):
+
+  retstring = "<tr><td>"+rowip+"</td>"
+  for neighborip in neighborlist:
+    if neighborip in latencylist:
+      retstring = retstring + "<td>"+str(latencylist[neighborip])[:4]+"s</td>"
+    else:
+      retstring = retstring + "<td>Unknown</td>"
+
+  retstring = retstring + "</tr>"
+  return retstring
+
+
+
+# Generates a HTML page that represents the current status of the program
+def generate_status_page():
+  webpage = "<html><head><title>Latency Information</title></head><body><h1>Latency information from "+getmyip()+' </h1><table border="1">'
+
+  webpage = webpage + "<tr><td></td><td>"+ "</td><td>".join(mycontext['neighborlist'])+"</td></tr>"
+
+  for nodeip in mycontext['neighborlist']:
+    if nodeip in mycontext['row']:
+      webpage = webpage + mycontext['row'][nodeip]+'\n'
+    else:
+      webpage = webpage + '<tr><td>'+nodeip+'</td><td>No Data Reported</td></tr>\n'
+
+  # now the footer...
+  webpage = webpage + '</table></html>'
+
+  return webpage
+
+
+
+# Displays a web page with the latency information
+def handle_http_request(srcip,srcport,connobj, ch, mainch):
+  # Get the header
+  try:
+    total_data = ''
+    # We use a separate string to store the received data so that we don't have to
+    # re-check the beginning parts of the string multiple times
+    new_data = ''
+    # The HTTP header ends once we see the char combination '\n\n', which
+    # is an empty string.
+    while '\n\n' not in new_data:
+      # Receive in chunks to avoid reading too much data
+      data = connobj.recv(4096)
+      # This is because Windows uses \r\n, Linux/Macs use \n.
+      # By doing this, we avoid having to program special cases for
+      # the different endline formats.
+      new_data = data.replace('\r\n', '\n')
+      total_data += new_data
+
+    # keep everything after the first '\n\n' intact, just incase there is
+    # more content after the header that we may need
+    # Potential Bug?: We ignore the overflow data
+    header, overflow = total_data.split('\n\n', 1)
+
+  except Exception, e:
+    if "Socket closed" in str(e):
+      # We can't do anything if the socket is closed
+      return
+    raise
+
+  # Get the request path, which is inbetween the HTTP action keyword and the
+  # HTTP version number.
+  # The http action keyword is the first word with no whitespace.
+  everything_after_httpaction = header.split(None, 1)[1]
+  # Following the path is the HTTP/[VERSION_NUMBER].
+  # We can use that as a delimiter to extract the path.
+  request_path = everything_after_httpaction.split(" HTTP/")[0]
+
+  # Generate the data to send back
+  # Don't respond with anything if they have something in the request path.
+  # This include favicons. We don't want to generate the webpage needlessly.
+  if request_path != '/':
+    data = 'HTTP/1.1 404 Not Found\n\n'
+  else:
+    webpage = generate_status_page()
+    # combine everything into one unit for sending
+    data = 'HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: '+str(len(webpage))+'\nServer: Seattle Testbed\n\n'+webpage
+
+  # send the response
+  try:
+    sent = 0
+    while sent < len(data):
+      sent += connobj.send(data[sent:])
+    # and we're done, so let's close this connection...
+    connobj.close()
+  except Exception, e:
+    if "Socket closed" in str(e):
+      # We can't do anything if the socket is closed
+      return
+    raise
+
+
+
+if callfunc == 'initialize':
+
+  # this holds the response information (i.e. when nodes responded)
+  mycontext['latency'] = {}
+
+  # this remembers when we sent a probe
+  mycontext['sendtime'] = {}
+
+  # this remembers row data from the other nodes
+  mycontext['row'] = {}
+  
+  # get the nodes to probe
+  mycontext['neighborlist'] = []
+  for line in file("neighboriplist.txt"):
+    mycontext['neighborlist'].append(line.strip())
+
+  ip = getmyip() 
+  if len(callargs) != 1:
+    raise Exception, "Must specify the port to use"
+  pingport = int(callargs[0])
+
+  # call gotmessage whenever receiving a message
+  recvmess(ip,pingport,got_message)  
+
+  probe_neighbors(pingport)
+
+  # we want to register a function to show a status webpage (TCP port)
+  pageport = int(callargs[0])
+  waitforconn(ip,pageport,handle_http_request)
+

@@ -1,0 +1,71 @@
+"""
+gee_for_nat.mix --- GENI Experiment Engine, Seattle client program
+  (with added lookup of external IP address for nodes behind NATs)
+
+Take this node's IP address, do a geo IP lookup, and post the result 
+on the GEETutorial web page. If this node has a private IP address, 
+attempt to use its NAT gateway's external public IP address instead.
+
+Usage:
+
+Before running, preprocess this file:
+  python repypp.py gee_for_nat.mix gee.repy
+
+To run this program in seash,
+  username@browsegood !> run gee.repy
+
+You may supply an argument to use a different slice name:
+  username@browsegood !> run gee.repy MyAlternativeSliceName
+"""
+
+# These are the libraries we use
+include geoip_client.repy
+include httpretrieve.repy
+
+
+# Our main function
+if callfunc == 'initialize':
+  # Set up the name to list us under on the website.
+  if callargs:
+    slicename = callargs[0]
+  else:
+    slicename = "SeattleGEEDemo"
+
+  thisnodeIP = getmyip()
+
+  # We can't do geo IP lookups on private addresses, 
+  # so get our NAT gateway's address instead
+  if thisnodeIP.startswith("192.168.") or thisnodeIP.startswith("10."):
+    # XXX Should check 172.16/12 too!
+    print "Note: I have a private IP address,", getmyip()
+    try:
+      # Get the public IP from Amazon AWS' checkip service.
+      # (We need to strip whitespace off the returned string.)
+      thisnodeIP = httpretrieve_open("http://checkip.amazonaws.com/").read().strip()
+      print "I will use my NAT gateway's public IP address instead:", thisnodeIP
+    except:
+      # Looks like I couldn't contact the checkip service. Continue anyway.
+      pass
+
+  # Do a geo IP lookup now
+  try:
+    geoip_init_client()
+    location_dict = geoip_record_by_addr(thisnodeIP, graceperiod=10, timeout=10)
+  except Exception:
+    # Couldn't look up this IP. Fabricate coordinates then.
+    latitudestr, longitudestr = '0', '0'
+  else:
+    latitudestr = str(location_dict['latitude'])
+    longitudestr = str(location_dict['longitude'])
+
+  print "\n\nGeoIP lookup results for IP address " + thisnodeIP + ":"
+  print "lat:", latitudestr, "lng:", longitudestr, "\n\n"
+
+  # Construct the URL we will contact to commit this data
+  myurl = "http://www.lively-web.org/nodejs/GEETutorial/helloWorld"
+  querydict = {"slice": slicename, "name": "Rules", 'ip': thisnodeIP, 
+      "local": thisnodeIP, "lat": latitudestr, "lng": longitudestr}
+
+  # Do the actual HTTP request, and print its results
+  print httpretrieve_open(myurl,querydata=querydict).read()
+

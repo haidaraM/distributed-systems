@@ -106,3 +106,4 @@ ENV/
 .idea
 .vscode
 keys.json
+pre-lab/_minted-prelab

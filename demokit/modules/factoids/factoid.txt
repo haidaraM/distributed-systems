@@ -1,0 +1,6 @@
+- You can save seash's current state using 'savestate' command.
+- You can load seash's previous state using 'loadstate' command.
+- You can set user variables using 'set' command.
+- You can press the Tab key to enable tab complete when typing commands.
+- You can see available seash factoids using 'show factoids [number of factoids]/all' command.
+- You can list all available seash modules using 'show modules' command.
