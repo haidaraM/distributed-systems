@@ -46,13 +46,64 @@ import sys
 # and builds and returns a word/count dict for it.
 # Then print_words() and print_top() can just call the utility function.
 
+def read_file(filename):
+    """
+    Utility function to read the file
+    :param filename: file to read
+    :return: word/count dict
+    """
+    count_dict = {}
+    with open(filename, "r") as filecontent:
+        for line in filecontent:
+            words = line.lower().split()
+            for word in words:
+                if word in count_dict:
+                    count_dict[word] += 1
+                else:
+                    count_dict[word] = 1
+
+    return count_dict
+
+
+def print_words(filename):
+    """
+    Counts how often each word appears in the file and prints:
+    word1 count1
+    word2 count2
+    :param filename: file to read
+    :return: None
+    """
+    count_dict = read_file(filename)
+
+    for key in sorted(count_dict.keys()):
+        print key, count_dict[key]
+
+
+def print_top(filename):
+    """
+    Similar to print_words but print the 20 most common words
+    word1 count1
+    word2 count2
+    :param filename: file to read
+    :return: None
+    """
+    count_dict = read_file(filename)
+
+    items = count_dict.items()
+
+    most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]
+
+    for word in most_commons_words:
+        print word[0], word[-1]
+
+
 ###
 
 # This basic command line argument parsing code is provided and
 # calls the print_words() and print_top() functions which you must define.
 def main():
     if len(sys.argv) != 3:
-        print 'usage: ./wordcount.py {--count | --topcount} file'
+        print('usage: ./wordcount.py {--count | --topcount} file')
         sys.exit(1)
 
     option = sys.argv[1]
@@ -62,7 +113,7 @@ def main():
     elif option == '--topcount':
         print_top(filename)
     else:
-        print 'unknown option: ' + option
+        print ('unknown option: ' + option)
         sys.exit(1)
 
 
