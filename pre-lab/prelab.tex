@@ -9,8 +9,12 @@
 \usepackage{mathtools,amssymb,amsthm}% packages de l'AMS + mathtools
 \usepackage{geometry} % pour les marges et tout ça
 
-\geometry{
-margin=0.9in }
+\geometry{margin=0.9in }
+\usepackage{minted}
+\definecolor{bg}{rgb}{0.95,0.95,0.95}
+\setminted{breaklines=true, bgcolor=bg,linenos=true}
+\setmintedinline{linenos=false,breaklines=false}
+
 
 \usepackage{ulem} % pour barrer un mot
 \usepackage{tikz} % pour dessiner des schemas
@@ -20,12 +24,11 @@ margin=0.9in }
 \renewcommand\thesubsection{\thesection.\arabic{subsection}}
 \renewcommand\thesubsubsection{\thesubsection.\alph{subsubsection}}
 
-\newcommand{\exercisenumber}{x}
 
 \usepackage[unicode=true]{hyperref}
 \hypersetup{breaklinks=true,
             pdfauthor={Mohamed El Mouctar HAIDARA},
-            pdftitle={Exercises from week \exercisenumber{}},
+            pdftitle={Pre-assignment - TDA596 Distributed systems},
             colorlinks=true,
             citecolor=blue,
             urlcolor=blue,
@@ -37,7 +40,7 @@ margin=0.9in }
 
 
 \begin{document}
-\title{Pre-assignment}
+\title{Pre-assignment - TDA596 Distributed systems}
 \author{Mohamed El Mouctar HAIDARA \href{mailto:mouctar@student.chalmers.se}{mouctar@student.chalmers.se}}
 
 \maketitle
@@ -49,9 +52,28 @@ The source code for the exercises is located in the root folder. There are three
 \begin{enumerate}
 \item Seattle is a platform for networking and distributed systems research. It's free, community-driven, and offers a large deployment of computers spread across the world.
 
-\item A vessel is a virtual machine in the Seattle framework.
+\item A vessel is a virtual machine in the Seattle framework. It is a controlled environment for running code (implemented using the repy sandbox).
 
 \item The programming language used is Repy. Repy is a Python-based sandbox which restricts API calls and limits the consumption of resources such as CPU, memory, storage space, and network bandwidth. Repy has a limited API for accessing system resources. This is in order to prevent a malicious user using a bug in the Python libraries to escape from the sandbox.
+
+\item To run locally a program, you can type : 
+
+\mintinline{bash}{python <path to repy.py> <path to restrictions file> <path to source file>}
+
+\item  To run program remotely on the vessels or VMs, you need: 
+\begin{enumerate}
+	\item To get some vessels on which you want to run your program. This can be done on the ClearingHouse page once you are registered. You will also get some keys (public and private) that are used to connect to vessels.
+	\item To run the Seattle Shell (seach) \mintinline{bash}{python seash.py}. This will run an interactive shell.
+	\item To load your account keys \mintinline{bash}{!> loadkeys yourusername}. You have to put the keys files (yourusername.publickey, yourusername.privatekey)in the same directory as the file \mintinline{bash}{seash.py}.
+	
+	\item To connect by typing \mintinline{bash}{!> as yourusername} in seash. After this step, you can see the vessels you control: \mintinline{bash}{yourusername@ !> browse}.
+	
+	After these steps, you can run a program on a specific or many vessels. For example, the following command will run the helloworld file on the vessel number 1.
+	\mintinline{bash}{yourusername@ !> on %1 run helloworld.repy}.
+\end{enumerate}
+
+
+\item The line \mintinline{python}{listencommhandle = waitforconn(ip,port,hello)}.
 
 
 \end{enumerate}
