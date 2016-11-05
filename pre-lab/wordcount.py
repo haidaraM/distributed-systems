@@ -97,6 +97,7 @@ def print_top(filename):
     items = count_dict.items()  # returns a list of (key, value) tuples
 
     # sorts by value and takes the first 20
+    # I know that I can't use lambda in Repy
     most_commons_words = sorted(items, reverse=True, key=lambda t: t[-1])[:20]
 
     for word in most_commons_words:

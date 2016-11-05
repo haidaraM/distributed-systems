@@ -15,6 +15,8 @@
 \setminted{breaklines=true, bgcolor=bg,linenos=true}
 \setmintedinline{linenos=false,breaklines=false}
 
+  
+ \newcommand{\bash}[1]{\mintinline{bash}{#1}}
 
 \usepackage{ulem} % pour barrer un mot
 \usepackage{tikz} % pour dessiner des schemas
@@ -73,7 +75,7 @@ The source code for the exercises is located in the root folder. There are three
 \end{enumerate}
 
 
-\item The line \mintinline{python}{listencommhandle = waitforconn(ip,port,hello)}.
+\item The command \mintinline{python}{listencommhandle = waitforconn(ip,port,hello)} is used to listen connection the specified \bash{ip} and \bash{port}. Once a connection has been established, the callback \bash{hello} will be called.
 
 
 \end{enumerate}
