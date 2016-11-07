@@ -1,0 +1,39 @@
+def hello(ip,port,sockobj, thiscommhandle,listencommhandle):
+  sockobj.recv(512) # Receive HTTP header
+  mycontext['pagecount'] = mycontext['pagecount'] + 1
+
+  htmlresponse = "<html><head><title>Hello World</title></head>" + \
+    "<body><h1> Hello World!</h1><p>You are visitor " + \
+    str(mycontext['pagecount']) + "</p><p>I've been running " + \
+    str(getruntime())+" seconds</p></body></html>"
+
+  sockobj.send("HTTP/1.1 200 OK\r\nContent-type: text/html\r\n" + \
+    "Content-length: %i\r\n\r\n%s" % (len(htmlresponse), htmlresponse))
+
+  stopcomm(thiscommhandle)   # close my connection with this user
+ 
+def stop_listening(commhandle):
+  stopcomm(commhandle)   # this will deregister hello
+
+if callfunc == 'initialize':
+  mycontext['pagecount'] = 0
+  
+  if len(callargs) > 1:
+    raise Exception("Too many call arguments")
+
+  # Running remotely:
+  # whenever this vessel gets a connection on its IPaddress:GENIport it'll call hello
+  elif len(callargs) == 1:
+    port = int(callargs[0])
+    ip = getmyip()
+
+  # Running locally:
+  # whenever we get a connection on 127.0.0.1:12345 we'll call hello
+  else:
+    port = 12345
+    ip = '127.0.0.1'
+  listencommhandle = waitforconn(ip,port,hello)
+  
+  # wait 60 seconds, then call stop_listening with listencommhandle
+  eventhandle = settimer(30, stop_listening, (listencommhandle,)) 
+  
