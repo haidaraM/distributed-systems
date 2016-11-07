@@ -107,6 +107,7 @@ ENV/
 .vscode
 keys.json
 pre-lab/_minted-prelab
+*.zip
 
 # Seattle generated files
 DORadvertise_repy.py                                                                                                                               
