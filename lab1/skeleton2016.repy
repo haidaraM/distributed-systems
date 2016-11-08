@@ -3,73 +3,96 @@
 
 # ------------------------------------------------------------------------------   
 # Start listening and handle incoming connections in board() function
-# ------------------------------------------------------------------------------   
-def start_board():
-  ip = mycontext['ip']
-  port = mycontext['port']
-  print "Listening on IP " + str(ip) +" port " + str(port)
-  try: 
-    listencommhandle = waitforconn(ip, port, board_connection_handler)
-  except Exception, e:
-    print "Exception in start_board: %s, %s\n" %(type(e), e)
-    raise
-    #pass
+# ------------------------------------------------------------------------------
 
-# ------------------------------------------------------------------------------    
+
+def start_board():
+    ip = mycontext['ip']
+    port = mycontext['port']
+    print "Listening on IP " + str(ip) + " port " + str(port)
+    try:
+        listencommhandle = waitforconn(ip, port, board_connection_handler)
+    except Exception, e:
+        print "Exception in start_board: %s, %s\n" % (type(e), e)
+        raise
+        # pass
+
+
+# ------------------------------------------------------------------------------
 # Called when an incoming message is received. 
 # --> Important starting point
 # ------------------------------------------------------------------------------    
 def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle):
-  try:
-    msgheader = sockobj.recv(1024) # Receive message
-    
-    print 'CHANGE ME!!!\n'
-    
-    print '****Request:\n%s' % msgheader
-    # React depending on message type: HTTP GET or POST, or some other type of communication.
-    if msgheader.startswith( 'GET' ):
-      get_board_handler(msgheader, sockobj, thiscommhandle)
-    else:
-      other_requests_handler(msgheader, sockobj, thiscommhandle)
+    try:
+        msgheader = sockobj.recv(1024)  # Receive message
 
-  except Exception, e:
-    print "Exception in board: %s, %s\n" %(type(e), e)
-    #raise
+        # print 'CHANGE ME!!!\n'
+
+        # print '****Request:\n%s' % msgheader
+        # React depending on message type: HTTP GET or POST, or some other type of communication.
+        if msgheader.startswith('GET'):
+            get_board_handler(msgheader, sockobj, thiscommhandle)
+        else:
+            other_requests_handler(msgheader, sockobj, thiscommhandle)
+
+    except Exception, e:
+        print "Exception in board: %s, %s\n" % (type(e), e)
+        # raise
+
 
 # ------------------------------------------------------------------------------
 # Handles initial GET request from browser, outputs HTML string and closes socket.
 # ------------------------------------------------------------------------------
 def get_board_handler(msgheader, sockobj, thiscommhandle):
-  htmlresponse = generate_html_page()
-  res=make_http_response(200, 'OK', htmlresponse)
-  sockobj.send(res)
-  stopcomm(thiscommhandle) 
+    htmlresponse = generate_html_page()
+    res = make_http_response(200, 'OK', htmlresponse)
+    sockobj.send(res)
+    stopcomm(thiscommhandle)
+
+
+def delete_entry(entry_id):
+    del mycontext['entries'][entry_id]
+
+
+def modify_entry(entry_id, new_text):
+    mycontext['entries'][entry_id] = new_text
+
+
+def add_entry(entry):
+    next_id = mycontext['last_id'] + 1
+    mycontext['last_id'] = next_id
+    mycontext['entries'][next_id] = entry
+
 
 # ------------------------------------------------------------------------------
-# Handles initial GET request from browser, outputs HTML string and closes socket.
+# Handles POST requests from browser
 # ------------------------------------------------------------------------------
 def other_requests_handler(msgheader, sockobj, thiscommhandle):
-  # extract the query from the HTTP request  
-  query = extract_http_request_contents(msgheader)
-  print query
-  # extract the query parameters
-  parameters = extract_parameters_from_query(query)
-  print parameters
-  print parameters['entry']
+    # extract the query from the HTTP request
+    query = extract_http_request_contents(msgheader)
+    print "query", query
+    # extract the query parameters
+    parameters = extract_parameters_from_query(query)
+    print "parameters", parameters
+    print parameters['entry']
 
-  next_id = mycontext['last_id']+1
+    # we split the url to get the URI
+    splitted_header = msgheader.split()
+    uri = splitted_header[1]
 
-  mycontext['last_id'] = next_id
-  
-  #newentry = mycontext['entry_template'] %('entries/%d' % (next_id), next_id, parameters['entry'])
-  mycontext['entries'][next_id] = parameters['entry']
-  #newcontext = mycontext['entries']
-  
-  
-  
-  # Do not mix HTML code with the server code as done here. This is a bad practice
-  
-  stopcomm(thiscommhandle) 
+    if uri == "/entries":
+        # here we add a new entry
+        add_entry(parameters['entry'])
+    else:
+        entry_id = uri.split('/')[2]
+
+        if parameters['delete'] == '1':
+            delete_entry(int(entry_id))
+        else:
+            modify_entry(int(entry_id), parameters['entry'])
+
+    stopcomm(thiscommhandle)
+
 
 # ------------------------------------------------------------------------------
 # Wrap into HTTP headers
@@ -78,98 +101,104 @@ def make_http_response(status, status_text, htmlresponse):
     response_template = "HTTP/1.1 %d %s\r\nContent-type: text/html\r\nContent-length: %i\r\n\r\n%s"
     return response_template % (status, status_text, len(htmlresponse), htmlresponse)
 
+
 # ------------------------------------------------------------------------------
 # Utility function to extract the contents (payload) from HTTP request
 # ------------------------------------------------------------------------------
 def extract_http_request_contents(header):
-  # find content length
-  conent_length = header.split('Content-Length: ')[1]
-  conent_length = int(conent_length.split('\r\n')[0])
-  
-  # extract the http response body and discard the header
-  contetns = header[-conent_length:]
-  return contetns
+    # find content length
+    conent_length = header.split('Content-Length: ')[1]
+    conent_length = int(conent_length.split('\r\n')[0])
+
+    # extract the http response body and discard the header
+    contetns = header[-conent_length:]
+    return contetns
+
 
 def get_entries_in_html():
-  output = ""
+    output = ""
 
-  for entry_id in mycontext['entries']:
-    entry = mycontext['entries'][entry_id]
-    output += mycontext['entry_template'] %('entries/%d' % (entry_id), entry_id, entry)
+    for entry_id in mycontext['entries']:
+        entry = mycontext['entries'][entry_id]
+        output += mycontext['entry_template'] % ('entries/%d' % (entry_id), entry_id, entry)
 
-  return output
+    return output
+
 
 # ------------------------------------------------------------------------------
 # Utility function to extract query parameter from HTML query
 # ------------------------------------------------------------------------------
 def extract_parameters_from_query(msg):
-  # extract the query parameters as a dictionary: {name:value}
-  # example input format: comment=aa&ip=127.0.0.1&port=63101&action=Delete
-  parameters={}
-  arr = msg.split('&')
-  for a in arr:
-    pp = a.split('=')
-    if len(pp)>1:
-      parameters[pp[0]] = pp[1]
-  return parameters
+    # extract the query parameters as a dictionary: {name:value}
+    # example input format: comment=aa&ip=127.0.0.1&port=63101&action=Delete
+    parameters = {}
+    arr = msg.split('&')
+    for a in arr:
+        pp = a.split('=')
+        if len(pp) > 1:
+            parameters[pp[0]] = pp[1]
+    return parameters
+
 
 # ------------------------------------------------------------------------------
 # Outputs the blackboard html 
 # ------------------------------------------------------------------------------   
 def generate_html_page():
-  #Initialize blackboard content
-  
-  
+    # Initialize blackboard content
 
-  entries = get_entries_in_html()
-  # dynamic title showing Ip address, port and up time. 
-  title='Sample board @ %s:%d. Up time: %d' %( str(mycontext['ip']), mycontext['port'], int(getruntime()) )
-  content = mycontext['boardcontents_template'] %( title, entries )
-  fullpage_h = mycontext['frontpage_header_template'] + content
-  fullpage = fullpage_h + mycontext['frontpage_footer_template'] % mycontext['authors']
-  #print entries, content, fullpage
-  return fullpage
-  
+    entries = get_entries_in_html()
+    # dynamic title showing Ip address, port and up time.
+    title = 'Sample board @ %s:%d. Up time: %d' % (str(mycontext['ip']), mycontext['port'], int(getruntime()))
+    content = mycontext['boardcontents_template'] % (title, entries)
+    fullpage_h = mycontext['frontpage_header_template'] + content
+    fullpage = fullpage_h + mycontext['frontpage_footer_template'] % mycontext['authors']
+    # print entries, content, fullpage
+    return fullpage
+
+
 # ------------------------------------------------------------------------------    
 # Main entry point of the program. Initalizes global variables in mycontext
 # and calls start_board() which opens a socket for incoming connections.
 # ------------------------------------------------------------------------------
 if callfunc == 'initialize':
-  # whenever this vessel gets a connection on its IP:port it'll call function board_connection_handler
-  if len(callargs) == 1 or len(callargs) == 2:
-    port = int(callargs[0])
-    if len(callargs) == 2:
-      ip=str(callargs[1])
+    # whenever this vessel gets a connection on its IP:port it'll call function board_connection_handler
+    if len(callargs) == 1 or len(callargs) == 2:
+        port = int(callargs[0])
+        if len(callargs) == 2:
+            ip = str(callargs[1])
+        else:
+            try:
+                ip = getmyip()
+            except Exception, e:
+                print "Could not get an IP\n"
+                print (type(e), e)
+                raise
+
+    # Fail if we don't have 1 or 2 arguments
     else:
-      try:
-        ip = getmyip()
-      except Exception, e:
-        print "Could not get an IP\n"
-        print (type(e), e)
-        raise
-  
-  # Fail if we don't have 1 or 2 arguments  
-  else:
-    raise Exception("Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
+        raise Exception(
+            "Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
 
-  #Initialize Port and IP
-  mycontext['port'] = port
-  mycontext['ip'] = ip
-  
-  #read html template files
-  mycontext['last_id'] = 0
-  mycontext['entries'] = {}
-  mycontext['entry_template'] = file("entry_template.html").read()
-  mycontext['boardcontents_template'] = file("boardcontents_template.html").read()
-  mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
-  mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
+    # Initialize Port and IP
+    mycontext['port'] = port
+    mycontext['ip'] = ip
 
-  mycontext['authors'] = "sample author"
+    # read html template files
+    mycontext['entry_template'] = file("entry_template.html").read()
+    mycontext['boardcontents_template'] = file("boardcontents_template.html").read()
+    mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
+    mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
 
-  # e = Exception("ex");
-  # try:
-  #   print "%s, %s\n" %(type(e), e)
-  # except Exception, ee:
-  #   print ee
+    # Intialize the entries dict and first id
+    mycontext['last_id'] = 0
+    mycontext['entries'] = {}
 
-  start_board()
+    mycontext['authors'] = "sample author"
+
+    # e = Exception("ex");
+    # try:
+    #   print "%s, %s\n" %(type(e), e)
+    # except Exception, ee:
+    #   print ee
+
+    start_board()
