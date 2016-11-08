@@ -7,11 +7,11 @@
 
 
 def start_board():
-    ip = mycontext['ip']
-    port = mycontext['port']
-    print "Listening on IP " + str(ip) + " port " + str(port)
+    my_ip = mycontext['ip']
+    my_port = mycontext['port']
+    print "Listening on IP " + str(my_ip) + " port " + str(my_port)
     try:
-        listencommhandle = waitforconn(ip, port, board_connection_handler)
+        listencommhandle = waitforconn(my_ip, my_port, board_connection_handler)
     except Exception, e:
         print "Exception in start_board: %s, %s\n" % (type(e), e)
         raise
@@ -117,11 +117,18 @@ def make_http_response(status, status_text, htmlresponse):
 # ------------------------------------------------------------------------------
 def extract_http_request_contents(header):
     # find content length
-    conent_length = header.split('Content-Length: ')[1]
-    conent_length = int(conent_length.split('\r\n')[0])
+    content_length = header.split('Content-Length: ')
+
+    if len(content_length) == 1:
+        # we cannot find the string 'Content-Length: '
+        # we try with the lower case version. Header fields should be case-insensitive according to rfc 2616 section 4.2
+        content_length = header.split('content-length: ')
+
+    content_length = content_length[1]
+    content_length = int(content_length.split('\r\n')[0])
 
     # extract the http response body and discard the header
-    contents = header[-conent_length:]
+    contents = header[-content_length:]
     return contents
 
 
