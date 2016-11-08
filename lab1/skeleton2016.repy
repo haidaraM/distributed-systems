@@ -54,20 +54,25 @@ def delete_entry(entry_id):
     del mycontext['entries'][entry_id]
 
 
-def modify_entry(entry_id, new_text):
-    mycontext['entries'][entry_id] = new_text
+def modify_entry(entry_id, entry):
+    mycontext['entries'][entry_id] = entry
 
 
 def add_entry(entry):
     next_id = mycontext['last_id'] + 1
     mycontext['last_id'] = next_id
     mycontext['entries'][next_id] = entry
+    return next_id
 
 
-# ------------------------------------------------------------------------------
-# Handles POST requests from browser
-# ------------------------------------------------------------------------------
 def other_requests_handler(msgheader, sockobj, thiscommhandle):
+    """
+    Handles the post requests
+    :param msgheader: the request header
+    :param sockobj: the socket object
+    :param thiscommhandle: the command handle created by the current connection
+    :return:
+    """
     # extract the query from the HTTP request
     query = extract_http_request_contents(msgheader)
     print "query", query
@@ -81,14 +86,19 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
     uri = splitted_header[1]
 
     if uri == "/entries":
-        # here we add a new entry
-        add_entry(parameters['entry'])
+        # here we add a new entry and return the id of the newly created entry
+        new_id = add_entry(parameters['entry'])
+
+        sockobj.send(make_http_response(200, 'OK', str(new_id)))
     else:
         entry_id = uri.split('/')[2]
 
         if parameters['delete'] == '1':
             delete_entry(int(entry_id))
+            sockobj.send(make_http_response(204, 'OK', ""))
         else:
+            # we modify the entry by replacing it with new entry
+            sockobj.send(make_http_response(204, 'OK', ""))
             modify_entry(int(entry_id), parameters['entry'])
 
     stopcomm(thiscommhandle)
@@ -111,16 +121,20 @@ def extract_http_request_contents(header):
     conent_length = int(conent_length.split('\r\n')[0])
 
     # extract the http response body and discard the header
-    contetns = header[-conent_length:]
-    return contetns
+    contents = header[-conent_length:]
+    return contents
 
 
 def get_entries_in_html():
+    """
+    Utility function to get all the entries in a html format i.e if we have n entries, we will have n html form
+    :return: a string representing all the entries
+    """
     output = ""
 
     for entry_id in mycontext['entries']:
         entry = mycontext['entries'][entry_id]
-        output += mycontext['entry_template'] % ('entries/%d' % (entry_id), entry_id, entry)
+        output += mycontext['entry_template'] % ('entries/%d' % entry_id, entry_id, entry)
 
     return output
 
@@ -193,7 +207,8 @@ if callfunc == 'initialize':
     mycontext['last_id'] = 0
     mycontext['entries'] = {}
 
-    mycontext['authors'] = "sample author"
+    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
+                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
 
     # e = Exception("ex");
     # try:
