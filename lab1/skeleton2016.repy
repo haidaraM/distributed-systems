@@ -79,7 +79,6 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
     # extract the query parameters
     parameters = extract_parameters_from_query(query)
     print "parameters", parameters
-    print parameters['entry']
 
     # we split the url to get the URI
     splitted_header = msgheader.split()
@@ -87,6 +86,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
     if uri == "/entries":
         # here we add a new entry and return the id of the newly created entry
+        print "add. New value : ", parameters['entry']
         new_id = add_entry(parameters['entry'])
 
         sockobj.send(make_http_response(200, 'OK', str(new_id)))
@@ -95,9 +95,11 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
         if parameters['delete'] == '1':
             delete_entry(int(entry_id))
+            print 'delete'
             sockobj.send(make_http_response(204, 'OK', ""))
         else:
             # we modify the entry by replacing it with new entry
+            print 'modify. New value : ', parameters['entry']
             sockobj.send(make_http_response(204, 'OK', ""))
             modify_entry(int(entry_id), parameters['entry'])
 
@@ -132,20 +134,6 @@ def extract_http_request_contents(header):
     return contents
 
 
-def get_entries_in_html():
-    """
-    Utility function to get all the entries in a html format i.e if we have n entries, we will have n html form
-    :return: a string representing all the entries
-    """
-    output = ""
-
-    for entry_id in mycontext['entries']:
-        entry = mycontext['entries'][entry_id]
-        output += mycontext['entry_template'] % ('entries/%d' % entry_id, entry_id, entry)
-
-    return output
-
-
 # ------------------------------------------------------------------------------
 # Utility function to extract query parameter from HTML query
 # ------------------------------------------------------------------------------
@@ -159,6 +147,20 @@ def extract_parameters_from_query(msg):
         if len(pp) > 1:
             parameters[pp[0]] = pp[1]
     return parameters
+
+
+def get_entries_in_html():
+    """
+    Utility function to get all the entries in a html format i.e if we have n entries, we will have n html form
+    :return: a string representing all the entries
+    """
+    output = ""
+
+    for entry_id in mycontext['entries']:
+        entry = mycontext['entries'][entry_id]
+        output += mycontext['entry_template'] % ('entries/%d' % entry_id, entry_id, entry)
+
+    return output
 
 
 # ------------------------------------------------------------------------------

@@ -108,6 +108,7 @@ ENV/
 keys.json
 pre-lab/_minted-prelab
 *.zip
+neighborlist.txt
 
 # Seattle generated files
 DORadvertise_repy.py                                                                                                                               
