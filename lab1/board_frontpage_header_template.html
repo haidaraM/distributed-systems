@@ -107,8 +107,10 @@ An error shown here means the server is not responding -->
 <!-- This place shows the text box used to enter data to the blackboard by posting a request to the server -->
 <div id="board_form_placeholder">
     <h3>Submit to board</h3>
-    <form id="usrform" target="noreload-form-target">
-        <input type="text" name="entry" size="100%" autofocus required/>
+    <form id="usrform" class="form-inline" target="noreload-form-target">
+        <div class="form-group">
+            <input type="text" class="form-control" name="entry" autofocus required/>
+        </div>
         <input type="submit" class="btn btn-default" formmethod="post" formaction="entries" value="Submit to board"/>
     </form>
 </div>

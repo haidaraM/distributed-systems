@@ -114,7 +114,7 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
 
 def get_msg_from_neighbor(msgheader):
     """
-    This function is called when we receive a message that is not a GET or POST request
+    This function is called when we receive a message that is not a GET or POST request.
     :param msgheader: message header
     :return:
     """
