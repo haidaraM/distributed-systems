@@ -1,0 +1,14 @@
+if callfunc == 'initialize':
+    # just like python's open() function
+    myfileobject = open("hello.file", "w")
+
+    # we also could have used myfileobject.write("hello world\n")
+    print >> myfileobject, "hello world"
+
+    myfileobject.close()
+
+    # we can use file instead of open.   They work the same...
+    newfileobject = file("hello.file", "r")
+
+    print newfileobject.read()
+    newfileobject.close()

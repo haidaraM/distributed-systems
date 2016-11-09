@@ -1,0 +1,4 @@
+if callfunc == 'initialize':
+    print gethostbyname_ex("www.google.com")
+    print gethostbyname_ex("www.wikipedia.com")
+    print getmyip()

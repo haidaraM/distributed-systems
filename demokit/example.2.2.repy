@@ -1,0 +1,19 @@
+if callfunc == 'initialize':
+  for filename in callargs:   # callargs has all of the command line arguments in it.
+    
+    # just like python's open() function
+    myfileobject = open(filename,"w")   
+   
+    # we also could have used myfileobject.write("hello world\n")
+    print >> myfileobject, "hello world"
+    
+    myfileobject.close()
+
+  # now we'll go through and print the files in this directory
+  # (it may include things other than our files).
+  print listdir()
+  
+  for filename in callargs:   # let's remove our files now...
+    removefile(filename)  
+
+  print "The files:",callargs," should now be missing from ",listdir()  

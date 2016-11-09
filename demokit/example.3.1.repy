@@ -1,0 +1,10 @@
+if callfunc == 'initialize':
+
+    # open a connection to the google web server
+    socketobject = openconn("www.google.se", 80)
+
+    # this is a HTTP request...
+    socketobject.send("GET /index.html HTTP/1.1\r\nHost: www.google.com\r\n\r\n")
+
+    while True:
+        print socketobject.recv(4096)
