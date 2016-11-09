@@ -34,6 +34,9 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):
             other_requests_handler(msgheader, sockobj, thiscommhandle)
+        else:
+            print '****Request:\n%s\n****' % msgheader
+            get_msg_from_neighbor(msgheader)
 
     except Exception, e:
         print "Exception in board: %s, %s\n" % (type(e), e)
