@@ -35,7 +35,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
         elif msgheader.startswith('POST'):
             other_requests_handler(msgheader, sockobj, thiscommhandle)
         else:
-            print '****Request:\n%s\n****' % msgheader
+            # print '****Request:\n%s\n****' % msgheader
             get_msg_from_neighbor(msgheader)
 
     except Exception, e:
@@ -54,14 +54,31 @@ def get_board_handler(msgheader, sockobj, thiscommhandle):
 
 
 def delete_entry(entry_id):
-    del mycontext['entries'][entry_id]
+    try:
+        del mycontext['entries'][entry_id]
+    except KeyError:
+        # we try to delete an entry that is not in our dictionary. This can happen when this vessel didn't receive
+        # the request to add a new entry and we try to delete this entry by sending its id
+        pass
 
 
 def modify_entry(entry_id, entry):
+    """
+    Modify an entry
+    :param entry_id: the id of the entry we want to modify
+    :param entry: the substitute entry
+    :return:
+    """
+    # TODO : maybe check if the entry is in the dict or not
     mycontext['entries'][entry_id] = entry
 
 
 def add_entry(entry):
+    """
+    Add a new entry.
+    :param entry: entry to add
+    :return:
+    """
     next_id = mycontext['last_id'] + 1
     mycontext['last_id'] = next_id
     mycontext['entries'][next_id] = entry
@@ -83,15 +100,24 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
     else:
         msg_to_send = "modify\n%s\n%s" % (entry_id, entry)
 
+    my_port = mycontext['port']
+    my_ip = mycontext['ip']
     for neighbor in mycontext['neighbors']:
-        if neighbor != mycontext['ip']:
-            print "opening connection to ", neighbor
-            sockojb = openconn(neighbor, mycontext['port'])
+        if neighbor != my_ip:  # I don't send a msg to myself
+
+            print "Opening connection to", neighbor, "on port"
+            sockojb = openconn(neighbor, my_port)
+            print "Successful connection to", neighbor
             sockojb.send(msg_to_send)
             sockojb.close()
 
 
 def get_msg_from_neighbor(msgheader):
+    """
+    This function is called when we receive a message that is not a GET or POST request
+    :param msgheader: message header
+    :return:
+    """
     splitted_msg = msgheader.split("\n")
     print(splitted_msg)
     msg_type = splitted_msg[0]
@@ -268,7 +294,6 @@ if callfunc == 'initialize':
 
     # Initialize the neighbors
     mycontext['neighbors'] = []
-    mycontext['neighbors_port'] = []
 
     for line in file("neighborlist.txt", "r"):
         mycontext['neighbors'].append(line.strip())
