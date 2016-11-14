@@ -32,9 +32,10 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
         # React depending on message type: HTTP GET or POST, or some other type of communication.
         if msgheader.startswith('GET'):
             get_board_handler(msgheader, sockobj, thiscommhandle)
-        elif msgheader.startswith('POST'):
+        elif msgheader.startswith('POST'):  # the form has been submitted
             other_requests_handler(msgheader, sockobj, thiscommhandle)
-        else:
+            print '****Request:\n%s\n****' % msgheader
+        else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
             get_msg_from_neighbor(msgheader)
 
@@ -54,6 +55,11 @@ def get_board_handler(msgheader, sockobj, thiscommhandle):
 
 
 def delete_entry(entry_id):
+    """
+    Delete an entry
+    :param entry_id:
+    :return:
+    """
     try:
         del mycontext['entries'][entry_id]
     except KeyError:
@@ -69,8 +75,9 @@ def modify_entry(entry_id, entry):
     :param entry: the substitute entry
     :return:
     """
-    # TODO : maybe check if the entry is in the dict or not
-    mycontext['entries'][entry_id] = entry
+
+    if entry_id in mycontext['entries']:
+        mycontext['entries'][entry_id] = entry
 
 
 def add_entry(entry):
@@ -87,7 +94,7 @@ def add_entry(entry):
 
 def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
     """
-    Sends a message to the neighbors telling them to add/delete/modify an entry
+    Sends a message to the neighbors telling them to add/delete/modify an entry. For the next lab, we will do it the REST way.
     :param entry:
     :param msg_type
     :param entry_id
@@ -114,7 +121,7 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
 
 def get_msg_from_neighbor(msgheader):
     """
-    This function is called when we receive a message that is not a GET or POST request.
+    This function is called when we receive a message that is not a GET or POST request i.e from another vessel.
     :param msgheader: message header
     :return:
     """
@@ -150,6 +157,8 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
     # we split the url to get the URI
     splitted_header = msgheader.split()
+
+    # for example : /entries or /entries/id
     uri = splitted_header[1]
 
     if uri == "/entries":
@@ -165,6 +174,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
         entry_id = uri.split('/')[2]
 
         if parameters['delete'] == '1':
+            # We delete the entry
             delete_entry(int(entry_id))
             sockobj.send(make_http_response(204, 'OK', ""))
 
@@ -178,6 +188,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
             sockobj.send(make_http_response(204, 'OK', ""))
 
             stopcomm(thiscommhandle)
+
             send_msg_to_neighbors("modify", parameters['entry'], entry_id)
 
 
@@ -199,6 +210,7 @@ def extract_http_request_contents(header):
     if len(content_length) == 1:
         # we cannot find the string 'Content-Length: '
         # we try with the lower case version. Header fields should be case-insensitive according to rfc 2616 section 4.2
+        # Postman for instance sends it in lower case
         content_length = header.split('content-length: ')
 
     content_length = content_length[1]
@@ -226,7 +238,7 @@ def extract_parameters_from_query(msg):
 
 def get_entries_in_html():
     """
-    Utility function to get all the entries in a html format i.e if we have n entries, we will have n html form
+    Utility function to get all the entries in a html format
     :return: a string representing all the entries
     """
     output = ""
@@ -289,8 +301,8 @@ if callfunc == 'initialize':
     mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
 
     # Initialize the entries dict and first id
-    mycontext['last_id'] = 0
     mycontext['entries'] = {}
+    mycontext['last_id'] = 0
 
     # Initialize the neighbors
     mycontext['neighbors'] = []
