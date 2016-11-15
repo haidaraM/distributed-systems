@@ -1,0 +1,324 @@
+# FEEL FREE TO CHANGE THE CODE. 
+# This is just a dull example
+
+# ------------------------------------------------------------------------------   
+# Start listening and handle incoming connections in board() function
+# ------------------------------------------------------------------------------
+
+
+def start_board():
+    my_ip = mycontext['ip']
+    my_port = mycontext['port']
+    print "Listening on IP " + str(my_ip) + " port " + str(my_port)
+    try:
+        listencommhandle = waitforconn(my_ip, my_port, board_connection_handler)
+    except Exception, e:
+        print "Exception in start_board: %s, %s\n" % (type(e), e)
+        raise
+        # pass
+
+
+# ------------------------------------------------------------------------------
+# Called when an incoming message is received. 
+# --> Important starting point
+# ------------------------------------------------------------------------------    
+def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle):
+    try:
+        msgheader = sockobj.recv(1024)  # Receive message
+
+        # print 'CHANGE ME!!!\n'
+
+        # print '****Request:\n%s' % msgheader
+        # React depending on message type: HTTP GET or POST, or some other type of communication.
+        if msgheader.startswith('GET'):
+            get_board_handler(msgheader, sockobj, thiscommhandle)
+        elif msgheader.startswith('POST'):  # the form has been submitted
+            other_requests_handler(msgheader, sockobj, thiscommhandle)
+            print '****Request:\n%s\n****' % msgheader
+        else:  # if we are here, we received a message from another vessel
+            # print '****Request:\n%s\n****' % msgheader
+            get_msg_from_neighbor(msgheader)
+
+    except Exception, e:
+        print "Exception in board: %s, %s\n" % (type(e), e)
+        # raise
+
+
+# ------------------------------------------------------------------------------
+# Handles initial GET request from browser, outputs HTML string and closes socket.
+# ------------------------------------------------------------------------------
+def get_board_handler(msgheader, sockobj, thiscommhandle):
+    htmlresponse = generate_html_page()
+    res = make_http_response(200, 'OK', htmlresponse)
+    sockobj.send(res)
+    stopcomm(thiscommhandle)
+
+
+def delete_entry(entry_id):
+    """
+    Delete an entry
+    :param entry_id:
+    :return:
+    """
+    try:
+        del mycontext['entries'][entry_id]
+    except KeyError:
+        # we try to delete an entry that is not in our dictionary. This can happen when this vessel didn't receive
+        # the request to add a new entry and we try to delete this entry by sending its id
+        pass
+
+
+def modify_entry(entry_id, entry):
+    """
+    Modify an entry
+    :param entry_id: the id of the entry we want to modify
+    :param entry: the substitute entry
+    :return:
+    """
+
+    if entry_id in mycontext['entries']:
+        mycontext['entries'][entry_id] = entry
+
+
+def add_entry(entry):
+    """
+    Add a new entry.
+    :param entry: entry to add
+    :return:
+    """
+    next_id = mycontext['last_id'] + 1
+    mycontext['last_id'] = next_id
+    mycontext['entries'][next_id] = entry
+    return next_id
+
+
+def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
+    """
+    Sends a message to the neighbors telling them to add/delete/modify an entry. For the next lab, we will do it the REST way.
+    :param entry:
+    :param msg_type
+    :param entry_id
+    :return:
+    """
+    if msg_type == "add":
+        msg_to_send = "add\n%s" % entry
+    elif msg_type == "delete":
+        msg_to_send = "delete\n%s" % entry_id
+    else:
+        msg_to_send = "modify\n%s\n%s" % (entry_id, entry)
+
+    my_port = mycontext['port']
+    my_ip = mycontext['ip']
+    for neighbor in mycontext['neighbors']:
+        if neighbor != my_ip:  # I don't send a msg to myself
+
+            print "Opening connection to", neighbor, "on port"
+            sockojb = openconn(neighbor, my_port)
+            print "Successful connection to", neighbor
+            sockojb.send(msg_to_send)
+            sockojb.close()
+
+
+def get_msg_from_neighbor(msgheader):
+    """
+    This function is called when we receive a message that is not a GET or POST request i.e from another vessel.
+    :param msgheader: message header
+    :return:
+    """
+    splitted_msg = msgheader.split("\n")
+    print(splitted_msg)
+    msg_type = splitted_msg[0]
+
+    if msg_type == "add":
+        add_entry(splitted_msg[1])
+    elif msg_type == "delete":
+        entry_id = splitted_msg[1]
+        delete_entry(int(entry_id))
+    elif msg_type == "modify":
+        entry_id = splitted_msg[1]
+        entry = splitted_msg[2]
+        modify_entry(int(entry_id), entry)
+
+
+def other_requests_handler(msgheader, sockobj, thiscommhandle):
+    """
+    Handles the post requests
+    :param msgheader: the request header
+    :param sockobj: the socket object
+    :param thiscommhandle: the command handle created by the current connection
+    :return:
+    """
+    # extract the query from the HTTP request
+    query = extract_http_request_contents(msgheader)
+    print "query", query
+    # extract the query parameters
+    parameters = extract_parameters_from_query(query)
+    print "parameters", parameters
+
+    # we split the url to get the URI
+    splitted_header = msgheader.split()
+
+    # for example : /entries or /entries/id
+    uri = splitted_header[1]
+
+    if uri == "/entries":
+        # here we add a new entry and return the id of the newly created entry
+        print "add. New value : ", parameters['entry']
+        new_id = add_entry(parameters['entry'])
+        sockobj.send(make_http_response(200, 'OK', str(new_id)))
+        stopcomm(thiscommhandle)
+
+        send_msg_to_neighbors("add", parameters['entry'])
+
+    else:
+        entry_id = uri.split('/')[2]
+
+        if parameters['delete'] == '1':
+            # We delete the entry
+            delete_entry(int(entry_id))
+            sockobj.send(make_http_response(204, 'OK', ""))
+
+            stopcomm(thiscommhandle)
+
+            send_msg_to_neighbors("delete", None, entry_id)
+        else:
+            # we modify the entry by replacing it with new entry
+            print 'modify. New value : ', parameters['entry']
+            modify_entry(int(entry_id), parameters['entry'])
+            sockobj.send(make_http_response(204, 'OK', ""))
+
+            stopcomm(thiscommhandle)
+
+            send_msg_to_neighbors("modify", parameters['entry'], entry_id)
+
+
+# ------------------------------------------------------------------------------
+# Wrap into HTTP headers
+# ------------------------------------------------------------------------------
+def make_http_response(status, status_text, htmlresponse):
+    response_template = "HTTP/1.1 %d %s\r\nContent-type: text/html\r\nContent-length: %i\r\n\r\n%s"
+    return response_template % (status, status_text, len(htmlresponse), htmlresponse)
+
+
+# ------------------------------------------------------------------------------
+# Utility function to extract the contents (payload) from HTTP request
+# ------------------------------------------------------------------------------
+def extract_http_request_contents(header):
+    # find content length
+    content_length = header.split('Content-Length: ')
+
+    if len(content_length) == 1:
+        # we cannot find the string 'Content-Length: '
+        # we try with the lower case version. Header fields should be case-insensitive according to rfc 2616 section 4.2
+        # Postman for instance sends it in lower case
+        content_length = header.split('content-length: ')
+
+    content_length = content_length[1]
+    content_length = int(content_length.split('\r\n')[0])
+
+    # extract the http response body and discard the header
+    contents = header[-content_length:]
+    return contents
+
+
+# ------------------------------------------------------------------------------
+# Utility function to extract query parameter from HTML query
+# ------------------------------------------------------------------------------
+def extract_parameters_from_query(msg):
+    # extract the query parameters as a dictionary: {name:value}
+    # example input format: comment=aa&ip=127.0.0.1&port=63101&action=Delete
+    parameters = {}
+    arr = msg.split('&')
+    for a in arr:
+        pp = a.split('=')
+        if len(pp) > 1:
+            parameters[pp[0]] = pp[1]
+    return parameters
+
+
+def get_entries_in_html():
+    """
+    Utility function to get all the entries in a html format
+    :return: a string representing all the entries
+    """
+    output = ""
+
+    for entry_id in mycontext['entries']:
+        entry = mycontext['entries'][entry_id]
+        output += mycontext['entry_template'] % ('entries/%d' % entry_id, entry_id, entry)
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+# Outputs the blackboard html 
+# ------------------------------------------------------------------------------   
+def generate_html_page():
+    # Initialize blackboard content
+
+    entries = get_entries_in_html()
+
+    # dynamic title showing Ip address, port and up time.
+    title = 'Sample board @ %s:%d. Up time: %d' % (str(mycontext['ip']), mycontext['port'], int(getruntime()))
+    content = mycontext['boardcontents_template'] % (title, entries)
+    fullpage_h = mycontext['frontpage_header_template'] + content
+    fullpage = fullpage_h + mycontext['frontpage_footer_template'] % mycontext['authors']
+    # print entries, content, fullpage
+    return fullpage
+
+
+# ------------------------------------------------------------------------------    
+# Main entry point of the program. Initalizes global variables in mycontext
+# and calls start_board() which opens a socket for incoming connections.
+# ------------------------------------------------------------------------------
+if callfunc == 'initialize':
+    # whenever this vessel gets a connection on its IP:port it'll call function board_connection_handler
+    if len(callargs) == 1 or len(callargs) == 2:
+        port = int(callargs[0])
+        if len(callargs) == 2:
+            ip = str(callargs[1])
+        else:
+            try:
+                ip = getmyip()
+            except Exception, e:
+                print "Could not get an IP\n"
+                print (type(e), e)
+                raise
+
+    # Fail if we don't have 1 or 2 arguments
+    else:
+        raise Exception(
+            "Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
+
+    # Initialize Port and IP
+    mycontext['port'] = port
+    mycontext['ip'] = ip
+
+    # read html template files
+    mycontext['entry_template'] = file("entry_template.html").read()
+    mycontext['boardcontents_template'] = file("boardcontents_template.html").read()
+    mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
+    mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
+
+    # Initialize the entries dict and first id
+    mycontext['entries'] = {}
+    mycontext['last_id'] = 0
+
+    # Initialize the neighbors
+    mycontext['neighbors'] = []
+
+    for line in file("neighborlist.txt", "r"):
+        mycontext['neighbors'].append(line.strip())
+
+    # print mycontext['neighbors']
+
+    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
+                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
+
+    # e = Exception("ex");
+    # try:
+    #   print "%s, %s\n" %(type(e), e)
+    # except Exception, ee:
+    #   print ee
+
+    start_board()
