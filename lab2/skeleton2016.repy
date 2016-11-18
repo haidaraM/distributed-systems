@@ -4,12 +4,13 @@
 # ------------------------------------------------------------------------------   
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
+include election.repy
 
 
 def start_board():
     my_ip = mycontext['ip']
     my_port = mycontext['port']
-    print "Listening on IP " + str(my_ip) + " port " + str(my_port)
+    print "Listening on IP " + str(my_ip) + " port " + str(my_port) + " with id " + str(mycontext['my_id'])
     try:
         listencommhandle = waitforconn(my_ip, my_port, board_connection_handler)
     except Exception, e:
@@ -34,7 +35,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
             other_requests_handler(msgheader, sockobj, thiscommhandle)
-            print '****Request:\n%s\n****' % msgheader
+            # print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
             get_msg_from_neighbor(msgheader)
@@ -112,9 +113,9 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
     for neighbor in mycontext['neighbors']:
         if neighbor != my_ip:  # I don't send a msg to myself
 
-            print "Opening connection to", neighbor, "on port"
+            # print "Opening connection to", neighbor, "on port"
             sockojb = openconn(neighbor, my_port)
-            print "Successful connection to", neighbor
+            # print "Successful connection to", neighbor
             sockojb.send(msg_to_send)
             sockojb.close()
 
@@ -126,14 +127,21 @@ def get_msg_from_neighbor(msgheader):
     :return:
     """
     splitted_msg = msgheader.split("\n")
-    print(splitted_msg)
+
     msg_type = splitted_msg[0]
 
-    if msg_type == "add":
+    if msg_type == "election":
+        process_election_message(splitted_msg[1])
+
+    elif msg_type == "add":
+
         add_entry(splitted_msg[1])
+
     elif msg_type == "delete":
+
         entry_id = splitted_msg[1]
         delete_entry(int(entry_id))
+
     elif msg_type == "modify":
         entry_id = splitted_msg[1]
         entry = splitted_msg[2]
@@ -168,7 +176,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
         sockobj.send(make_http_response(200, 'OK', str(new_id)))
         stopcomm(thiscommhandle)
 
-        send_msg_to_neighbors("add", parameters['entry'])
+        # send_msg_to_neighbors("add", parameters['entry'])
 
     else:
         entry_id = uri.split('/')[2]
@@ -180,7 +188,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
             stopcomm(thiscommhandle)
 
-            send_msg_to_neighbors("delete", None, entry_id)
+            # send_msg_to_neighbors("delete", None, entry_id)
         else:
             # we modify the entry by replacing it with new entry
             print 'modify. New value : ', parameters['entry']
@@ -189,7 +197,7 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
             stopcomm(thiscommhandle)
 
-            send_msg_to_neighbors("modify", parameters['entry'], entry_id)
+            # send_msg_to_neighbors("modify", parameters['entry'], entry_id)
 
 
 # ------------------------------------------------------------------------------
@@ -259,7 +267,14 @@ def generate_html_page():
     entries = get_entries_in_html()
 
     # dynamic title showing Ip address, port and up time.
-    title = 'Sample board @ %s:%d. Up time: %d' % (str(mycontext['ip']), mycontext['port'], int(getruntime()))
+    title = 'Sample board @ %s:%d. Up time: %d. Id : %s.' \
+            % (str(mycontext['ip']), mycontext['port'], int(getruntime()), str(mycontext['my_id']))
+
+    # if I am the leader, print a message
+    # TODO : maybe use a lock here
+    if mycontext['leader_id'] == mycontext['my_id']:
+        title += "I'm the leader"
+
     content = mycontext['boardcontents_template'] % (title, entries)
     fullpage_h = mycontext['frontpage_header_template'] + content
     fullpage = fullpage_h + mycontext['frontpage_footer_template'] % mycontext['authors']
@@ -267,7 +282,43 @@ def generate_html_page():
     return fullpage
 
 
-# ------------------------------------------------------------------------------    
+def initialize_context():
+    """
+    Initializes the context by putting the necessary variables in the mycontext
+    :return:
+    """
+    # Initialize Port and IP
+    mycontext['port'] = port
+    mycontext['ip'] = ip
+
+    # read html template files
+    mycontext['entry_template'] = file("entry_template.html").read()
+    mycontext['boardcontents_template'] = file("boardcontents_template.html").read()
+    mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
+    mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
+
+    # Initialize the entries dict and first id
+    mycontext['entries'] = {}
+    mycontext['last_id'] = 0
+
+    # Initialize the neighbors
+    mycontext['neighbors'] = []
+
+    for line in file("neighborlist.txt", "r"):
+        mycontext['neighbors'].append(line.strip())
+
+    # authors
+    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
+                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
+
+    # generate my id
+    mycontext['my_id'] = int(randomfloat() * 1000)
+    mycontext['leader_id'] = None
+
+    mycontext['leader_id_lock'] = getlock()
+
+
+# ------------------------------------------------------------------------------
 # Main entry point of the program. Initalizes global variables in mycontext
 # and calls start_board() which opens a socket for incoming connections.
 # ------------------------------------------------------------------------------
@@ -290,30 +341,11 @@ if callfunc == 'initialize':
         raise Exception(
             "Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
 
-    # Initialize Port and IP
-    mycontext['port'] = port
-    mycontext['ip'] = ip
+    # context initialization
+    initialize_context()
 
-    # read html template files
-    mycontext['entry_template'] = file("entry_template.html").read()
-    mycontext['boardcontents_template'] = file("boardcontents_template.html").read()
-    mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
-    mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
-
-    # Initialize the entries dict and first id
-    mycontext['entries'] = {}
-    mycontext['last_id'] = 0
-
-    # Initialize the neighbors
-    mycontext['neighbors'] = []
-
-    for line in file("neighborlist.txt", "r"):
-        mycontext['neighbors'].append(line.strip())
-
-    # print mycontext['neighbors']
-
-    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
-                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
+    # begins election
+    mycontext['election_timer'] = settimer(5, begin_election, ())
 
     # e = Exception("ex");
     # try:
