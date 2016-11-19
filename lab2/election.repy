@@ -1,47 +1,66 @@
-def send_election_message(neighbor_address, message, append=True, max_try=0):
+def send_election_message(neighbor_address, message, append=True, nb_retry=0):
     """
-    Send
-    :param max_try:
+    Send an election message the neighbor_address
+    :param nb_retry:
     :param neighbor_address:
     :param message:
     :param append:
     :return:
     """
+
     try:
         if append:
-            new_msg = "election\n" + message + "%s|" % mycontext['my_id']
+            new_msg = "election\n" + message + "%s:%s|" % (mycontext['my_id'], mycontext['ip'])
         else:
             new_msg = "election\n%s|" % message
 
         sockobj = openconn(neighbor_address, mycontext['port'])
 
+        print mycontext['ip'], "sending message to", neighbor_address
+
         sockobj.send(new_msg)
         sockobj.close()
     except Exception, e:
-        if max_try < 3:
-            max_try += 1
-            send_election_message(neighbor_address, message, append, max_try)
+        # If we can't communicate, we retry 3 times by waiting 1 second before each retry
+        if nb_retry < 3:
+            nb_retry += 1
+            sleep(1)
+            send_election_message(neighbor_address, message, append, nb_retry)
         else:
-            print "Could not send election message to %s" % neighbor_address
+            # TODO : maybe exit the program here as we assume the communication between neighbors is reliable or try the next neighbor
+            print mycontext['ip'], "Could not send election message to %s" % neighbor_address
             print (type(e), e)
 
 
 def begin_election():
-    my_ip = mycontext['ip']
-
-    next_vessel = get_next_vessel_to(my_ip)
-    send_election_message(next_vessel, mycontext['my_id'], False)
+    """
+    Begin the election on this vessel
+    :return:
+    """
+    next_vessel = get_next_vessel_to(mycontext['ip'])
+    # I send my id and my ip adress : my_id:my_ip
+    message_to_send = str(mycontext['my_id']) + ":" + mycontext['ip']
+    send_election_message(next_vessel, message_to_send, False)
 
 
 def process_election_message(message):
     """
     Receive the message during the election process. The message contains the id of the vessels who receive and forward
     the message
-    :param message:
+    :param message: message containing the only the id and ip addresses of the neighbors
     :return:
     """
-    neighbor_ids = [int(item) for item in message.split("|") if len(item) != 0]
-    print "Election message received. Neighbors ids : %s" % neighbor_ids
+
+    # retrieving the ids and ip addresses from the message
+    neighbor_ids = []
+    neighbor_ips = []
+    for item in message.split("|"):
+        if len(item) != 0:
+            neighbor_id, neighbor_ip = item.split(":")
+            neighbor_ids.append(int(neighbor_id))
+            neighbor_ips.append(neighbor_ip)
+
+    print "Election message received. Neighbors ids : %s. Ip addresses : %s" % (neighbor_ids, neighbor_ips)
 
     if neighbor_ids[0] == mycontext['my_id']:  # if the first id is mine, the ring is done
 
@@ -50,10 +69,15 @@ def process_election_message(message):
         # find the leader.
         # This part is critical because it can be accessed by multiple threads at the same time
         leader_id = max(neighbor_ids)
-        print "The id of the leader is %d" % leader_id
-        mycontext['leader_id_lock'].acquire()
+        leader_ip = neighbor_ips[neighbor_ids.index(leader_id)]
+        print "The id of the leader is %d with ip %s" % (leader_id, leader_ip)
+        mycontext['leader_lock'].acquire()
         mycontext['leader_id'] = leader_id
-        mycontext['leader_id_lock'].release()
+        mycontext['leader_ip'] = leader_ip
+        mycontext['leader_lock'].release()
+
+        if leader_id == mycontext['my_id']:
+            print "I am the leader"
 
     else:  # otherwise, I append my my_id, and send the message to my neighbor
         send_election_message(get_next_vessel_to(mycontext['ip']), message, True)

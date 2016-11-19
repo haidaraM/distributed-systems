@@ -267,7 +267,7 @@ def generate_html_page():
     entries = get_entries_in_html()
 
     # dynamic title showing Ip address, port and up time.
-    title = 'Sample board @ %s:%d. Up time: %d. Id : %s.' \
+    title = 'Sample board @ %s:%d. Up time: %d. <br> Id : %s. ' \
             % (str(mycontext['ip']), mycontext['port'], int(getruntime()), str(mycontext['my_id']))
 
     # if I am the leader, print a message
@@ -314,8 +314,9 @@ def initialize_context():
     # generate my id
     mycontext['my_id'] = int(randomfloat() * 1000)
     mycontext['leader_id'] = None
+    mycontext['leader_ip'] = None
 
-    mycontext['leader_id_lock'] = getlock()
+    mycontext['leader_lock'] = getlock()
 
 
 # ------------------------------------------------------------------------------
@@ -344,8 +345,6 @@ if callfunc == 'initialize':
     # context initialization
     initialize_context()
 
-    # begins election
-    mycontext['election_timer'] = settimer(5, begin_election, ())
 
     # e = Exception("ex");
     # try:
@@ -354,3 +353,7 @@ if callfunc == 'initialize':
     #   print ee
 
     start_board()
+
+    # begins election
+    # mycontext['election_timer'] = settimer(5, begin_election, ())
+    begin_election()
