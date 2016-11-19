@@ -316,6 +316,9 @@ def initialize_context():
     mycontext['leader_id'] = None
     mycontext['leader_ip'] = None
 
+    # max number of retries to connect to a neighbor
+    mycontext['max_retry'] = 3
+
     mycontext['leader_lock'] = getlock()
 
 
@@ -344,7 +347,6 @@ if callfunc == 'initialize':
 
     # context initialization
     initialize_context()
-
 
     # e = Exception("ex");
     # try:

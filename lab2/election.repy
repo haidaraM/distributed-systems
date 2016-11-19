@@ -1,4 +1,4 @@
-def send_election_message(neighbor_address, message, append=True, nb_retry=0):
+def send_election_message(neighbor_address, message, append=True):
     """
     Send an election message the neighbor_address
     :param nb_retry:
@@ -7,29 +7,34 @@ def send_election_message(neighbor_address, message, append=True, nb_retry=0):
     :param append:
     :return:
     """
+    max_retry = mycontext['max_retry']
+    nb_retry = 1
+    success = False
 
-    try:
-        if append:
-            new_msg = "election\n" + message + "%s:%s|" % (mycontext['my_id'], mycontext['ip'])
-        else:
-            new_msg = "election\n%s|" % message
+    while not success and nb_retry <= max_retry:
 
-        sockobj = openconn(neighbor_address, mycontext['port'])
+        try:
+            if append:
+                new_msg = "election\n" + message + "%s:%s|" % (mycontext['my_id'], mycontext['ip'])
+            else:
+                new_msg = "election\n%s|" % message
 
-        print mycontext['ip'], "sending message to", neighbor_address
+            sockobj = openconn(neighbor_address, mycontext['port'])
 
-        sockobj.send(new_msg)
-        sockobj.close()
-    except Exception, e:
-        # If we can't communicate, we retry 3 times by waiting 1 second before each retry
-        if nb_retry < 3:
+            print mycontext['ip'], "sending message to", neighbor_address
+
+            sockobj.send(new_msg)
+
+            success = True
+
+            sockobj.close()
+        except Exception, e:
+            # If we can't communicate, we retry 3 times by waiting 1 second before each retry
             nb_retry += 1
-            sleep(1)
-            send_election_message(neighbor_address, message, append, nb_retry)
-        else:
-            # TODO : maybe exit the program here as we assume the communication between neighbors is reliable or try the next neighbor
-            print mycontext['ip'], "Could not send election message to %s" % neighbor_address
-            print (type(e), e)
+            print "Retrying to send message from", mycontext['ip'], "to", neighbor_address, "Error:", (type(e), e)
+
+    if not success:
+        print mycontext['ip'], "could not send election message t", neighbor_address, "after", max_retry, "retries"
 
 
 def begin_election():
