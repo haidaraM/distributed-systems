@@ -31,6 +31,7 @@ def send_election_message(neighbor_address, message, append=True):
         except Exception, e:
             # If we can't communicate, we retry 3 times by waiting 1 second before each retry
             nb_retry += 1
+            sleep(1)
             print "Retrying to send message from", mycontext['ip'], "to", neighbor_address, "Error:", (type(e), e)
 
     if not success:

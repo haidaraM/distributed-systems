@@ -36,9 +36,10 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
         elif msgheader.startswith('POST'):  # the form has been submitted
             other_requests_handler(msgheader, sockobj, thiscommhandle)
             # print '****Request:\n%s\n****' % msgheader
-        else:  # if we are here, we received a message from another vessel
+        else:  # if we are here, we received an election message
+            #
             # print '****Request:\n%s\n****' % msgheader
-            get_msg_from_neighbor(msgheader)
+            got_msg_from_a_vessel(msgheader)
 
     except Exception, e:
         print "Exception in board: %s, %s\n" % (type(e), e)
@@ -64,8 +65,7 @@ def delete_entry(entry_id):
     try:
         del mycontext['entries'][entry_id]
     except KeyError:
-        # we try to delete an entry that is not in our dictionary. This can happen when this vessel didn't receive
-        # the request to add a new entry and we try to delete this entry by sending its id
+        # Nothing special to do here
         pass
 
 
@@ -81,32 +81,21 @@ def modify_entry(entry_id, entry):
         mycontext['entries'][entry_id] = entry
 
 
-def add_entry(entry):
+def add_entry(entry_id, entry):
     """
     Add a new entry.
+    :param entry_id id of the new entry to add
     :param entry: entry to add
     :return:
     """
-    next_id = mycontext['last_id'] + 1
-    mycontext['last_id'] = next_id
-    mycontext['entries'][next_id] = entry
-    return next_id
+    mycontext['entries'][entry_id] = entry
 
 
-def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
+def send_msg_to_neighbors(msg_to_send):
     """
-    Sends a message to the neighbors telling them to add/delete/modify an entry. For the next lab, we will do it the REST way.
-    :param entry:
-    :param msg_type
-    :param entry_id
+    Used by the leader to send a message to the neighbors telling them to add/delete/modify an entry.
     :return:
     """
-    if msg_type == "add":
-        msg_to_send = "add\n%s" % entry
-    elif msg_type == "delete":
-        msg_to_send = "delete\n%s" % entry_id
-    else:
-        msg_to_send = "modify\n%s\n%s" % (entry_id, entry)
 
     my_port = mycontext['port']
     my_ip = mycontext['ip']
@@ -120,9 +109,28 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
             sockojb.close()
 
 
-def get_msg_from_neighbor(msgheader):
+def make_http_request(method, uri, parameters):
     """
-    This function is called when we receive a message that is not a GET or POST request i.e from another vessel.
+    Makes a http request with the given method, uri and parameters
+    :param method:
+    :param uri:
+    :param parameters:
+    :return:
+    """
+    # convert parameters to query string
+    query_string = ""
+    for key in parameters:
+        query_string += str(key) + "=" + str(parameters[key]) + "&"
+
+    request_template = "{method} {uri} HTTP/1.1\r\nHost: {host}\r\nContent-Length: {content_length}\r\n{content}"
+
+    return request_template.format(method=method, uri=uri, host=mycontext['ip'], content_length=len(query_string),
+                                   content=query_string)
+
+
+def got_msg_from_a_vessel(msgheader):
+    """
+    This function is called when a vessel receives that is not a GET or POST
     :param msgheader: message header
     :return:
     """
@@ -130,22 +138,32 @@ def get_msg_from_neighbor(msgheader):
 
     msg_type = splitted_msg[0]
 
+    # at the beginning everyone can be a leader
     if msg_type == "election":
         process_election_message(splitted_msg[1])
 
-    elif msg_type == "add":
 
-        add_entry(splitted_msg[1])
+def am_i_the_leader():
+    """
+    Returns True if i am the leader, False otherwise
+    :return:
+    """
+    return mycontext['my_id'] == mycontext['leader_id']
 
-    elif msg_type == "delete":
 
-        entry_id = splitted_msg[1]
-        delete_entry(int(entry_id))
+def send_to_leader(message):
+    """
+    Send a message to the leader
+    """
 
-    elif msg_type == "modify":
-        entry_id = splitted_msg[1]
-        entry = splitted_msg[2]
-        modify_entry(int(entry_id), entry)
+    port_number = mycontext['port']
+    leader_ip = mycontext['leader_ip']
+
+    sockojb = openconn(leader_ip, port_number)
+
+    sockojb.send(message)
+
+    sockojb.close()
 
 
 def other_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -158,10 +176,10 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
     """
     # extract the query from the HTTP request
     query = extract_http_request_contents(msgheader)
-    print "query", query
+    # print "query", query
     # extract the query parameters
     parameters = extract_parameters_from_query(query)
-    print "parameters", parameters
+    # print "parameters", parameters
 
     # we split the url to get the URI
     splitted_header = msgheader.split()
@@ -169,35 +187,86 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
     # for example : /entries or /entries/id
     uri = splitted_header[1]
 
-    if uri == "/entries":
-        # here we add a new entry and return the id of the newly created entry
-        print "add. New value : ", parameters['entry']
-        new_id = add_entry(parameters['entry'])
-        sockobj.send(make_http_response(200, 'OK', str(new_id)))
+    if uri == "/entries":  # adding a new entry
+
+        if am_i_the_leader():
+
+            mycontext['entry_lock'].acquire()
+            # generating the next new id
+            next_id = mycontext['last_id'] + 1
+            mycontext['last_id'] = next_id
+            add_entry(next_id, parameters['entry'])
+
+            parameters['entry_id'] = next_id
+            parameters['operation'] = "add"
+
+            request = make_http_request("POST", "/from_leader", parameters)
+            send_msg_to_neighbors(request)
+
+            mycontext['entry_lock'].release()
+        else:  # message received from the form => forward to the leader
+            request = make_http_request("POST", uri, parameters)
+            send_to_leader(request)
+
+        sockobj.send(make_http_response(200, 'OK', "Success"))
         stopcomm(thiscommhandle)
 
-        # send_msg_to_neighbors("add", parameters['entry'])
+    elif uri == "/from_leader":  # a non leader has received a message from the leader
+        print "received message from leader"
+        operation = parameters["operation"]
+        entry_id = int(parameters['entry_id'])
 
-    else:
+        mycontext['entry_lock'].acquire()
+
+        if operation == "add":
+            add_entry(entry_id, parameters['entry'])
+        elif operation == "delete":
+            delete_entry(entry_id)
+        elif operation == "modify":
+            modify_entry(entry_id, parameters['entry'])
+
+        mycontext['entry_lock'].release()
+
+    else:  # here we have an uri like /entries/<entry_id> : delete or modify
         entry_id = uri.split('/')[2]
 
         if parameters['delete'] == '1':
-            # We delete the entry
-            delete_entry(int(entry_id))
-            sockobj.send(make_http_response(204, 'OK', ""))
 
-            stopcomm(thiscommhandle)
+            if am_i_the_leader():
+                mycontext['entry_lock'].acquire()
 
-            # send_msg_to_neighbors("delete", None, entry_id)
+                delete_entry(int(entry_id))
+
+                parameters['entry_id'] = entry_id
+                parameters['operation'] = "delete"
+
+                request = make_http_request("POST", "/from_leader", parameters)
+                send_msg_to_neighbors(request)
+
+                mycontext['entry_lock'].release()
+            else:
+                request = make_http_request("POST", uri, parameters)
+                send_to_leader(request)
         else:
             # we modify the entry by replacing it with new entry
-            print 'modify. New value : ', parameters['entry']
-            modify_entry(int(entry_id), parameters['entry'])
-            sockobj.send(make_http_response(204, 'OK', ""))
+            if am_i_the_leader():
+                mycontext['entry_lock'].acquire()
 
-            stopcomm(thiscommhandle)
+                modify_entry(int(entry_id), parameters['entry'])
 
-            # send_msg_to_neighbors("modify", parameters['entry'], entry_id)
+                parameters['entry_id'] = entry_id
+                parameters['operation'] = "modify"
+
+                request = make_http_request("POST", "/from_leader", parameters)
+                send_msg_to_neighbors(request)
+
+                mycontext['entry_lock'].release()
+            else:
+                request = make_http_request("POST", uri, parameters)
+                send_to_leader(request)
+
+        sockobj.send(make_http_response(204, 'OK', "Success"))
+        stopcomm(thiscommhandle)
 
 
 # ------------------------------------------------------------------------------
@@ -282,14 +351,14 @@ def generate_html_page():
     return fullpage
 
 
-def initialize_context():
+def initialize_context(my_ip, my_port):
     """
     Initializes the context by putting the necessary variables in the mycontext
     :return:
     """
     # Initialize Port and IP
-    mycontext['port'] = port
-    mycontext['ip'] = ip
+    mycontext['port'] = my_port
+    mycontext['ip'] = my_ip
 
     # read html template files
     mycontext['entry_template'] = file("entry_template.html").read()
@@ -321,6 +390,8 @@ def initialize_context():
 
     mycontext['leader_lock'] = getlock()
 
+    mycontext['entry_lock'] = getlock()
+
 
 # ------------------------------------------------------------------------------
 # Main entry point of the program. Initalizes global variables in mycontext
@@ -346,7 +417,7 @@ if callfunc == 'initialize':
             "Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
 
     # context initialization
-    initialize_context()
+    initialize_context(ip, port)
 
     # e = Exception("ex");
     # try:
@@ -357,5 +428,6 @@ if callfunc == 'initialize':
     start_board()
 
     # begins election
-    # mycontext['election_timer'] = settimer(5, begin_election, ())
-    begin_election()
+    # wait a couple of secondes before starting the election
+    mycontext['election_timer'] = settimer(8, begin_election, ())
+    # begin_election()
