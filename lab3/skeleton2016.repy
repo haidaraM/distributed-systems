@@ -37,7 +37,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
             print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
-            get_msg_from_neighbor(msgheader)
+            get_msg_from_neighbor(msgheader, sockobj, thiscommhandle)
 
     except Exception, e:
         print "Exception in board: %s, %s\n" % (type(e), e)
@@ -62,10 +62,11 @@ def delete_entry(entry_id):
     """
     try:
         del mycontext['entries'][entry_id]
+        return True
     except KeyError:
         # we try to delete an entry that is not in our dictionary. This can happen when this vessel didn't receive
         # the request to add a new entry and we try to delete this entry by sending its id
-        pass
+        return False
 
 
 def modify_entry(entry_id, entry):
@@ -78,6 +79,9 @@ def modify_entry(entry_id, entry):
 
     if entry_id in mycontext['entries']:
         mycontext['entries'][entry_id] = entry
+        return True
+    else:
+        return False
 
 
 def add_entry(entry):
@@ -94,7 +98,18 @@ def add_entry(entry):
 
 def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
     """
-    Sends a message to the neighbors telling them to add/delete/modify an entry. For the next lab, we will do it the REST way.
+    Sends a message to the neighbors telling them to add/delete/modify an entry.
+    Here we define our API for the communication between the vessels.
+    The messages sent have the following form.
+
+    msg_type
+    entry|entry_id
+    entry
+
+    The first line is the message type that can be either "add", "delete" or "modify" to specify what to do with an entry.
+    Depending on the first line, the second line can be the entry itself (when adding), or the entry_id (when deleting or
+    modifying). If the message type id "modify", the last line is the modified entry.
+
     :param entry:
     :param msg_type
     :param entry_id
@@ -119,9 +134,12 @@ def send_msg_to_neighbors(msg_type, entry, entry_id=-1):
             sockojb.close()
 
 
-def get_msg_from_neighbor(msgheader):
+def get_msg_from_neighbor(msgheader, sockobj, thiscommhandle):
     """
     This function is called when we receive a message that is not a GET or POST request i.e from another vessel.
+    It handles the message according to our API definition.
+    :param sockobj:
+    :param thiscommhandle:
     :param msgheader: message header
     :return:
     """
@@ -133,11 +151,24 @@ def get_msg_from_neighbor(msgheader):
         add_entry(splitted_msg[1])
     elif msg_type == "delete":
         entry_id = splitted_msg[1]
-        delete_entry(int(entry_id))
+        res = delete_entry(int(entry_id))
+
+        if res:  # we have successfully deleted the entry
+            sockobj.send(make_http_response(204, 'OK', ""))
+        else:  # the entry is not in the map, we return a 404
+            sockobj.send(make_http_response(404, "Not found", "The entry with %s was not found." % entry_id))
+
     elif msg_type == "modify":
         entry_id = splitted_msg[1]
         entry = splitted_msg[2]
-        modify_entry(int(entry_id), entry)
+        res = modify_entry(int(entry_id), entry)
+
+        if res:  # we have successfully modified the entry
+            sockobj.send(make_http_response(204, 'OK', ""))
+        else:  # the entry is not in the map, we return a 404
+            sockobj.send(make_http_response(404, "Not found", "The entry with %s was not found." % entry_id))
+
+    stopcomm(thiscommhandle)
 
 
 def other_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -175,8 +206,12 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
         if parameters['delete'] == '1':
             # We delete the entry
-            delete_entry(int(entry_id))
-            sockobj.send(make_http_response(204, 'OK', ""))
+            res = delete_entry(int(entry_id))
+
+            if res:  # we have successfully deleted the entry
+                sockobj.send(make_http_response(204, 'OK', ""))
+            else:  # the entry is not in the map, we return a 404
+                sockobj.send(make_http_response(404, "Not found", "The entry with %s was not found." % entry_id))
 
             stopcomm(thiscommhandle)
 
@@ -184,8 +219,13 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
         else:
             # we modify the entry by replacing it with new entry
             print 'modify. New value : ', parameters['entry']
-            modify_entry(int(entry_id), parameters['entry'])
-            sockobj.send(make_http_response(204, 'OK', ""))
+
+            res = modify_entry(int(entry_id), parameters['entry'])
+
+            if res:  # we have successfully modified the entry
+                sockobj.send(make_http_response(204, 'OK', ""))
+            else:  # the entry is not in the map, we return a 404
+                sockobj.send(make_http_response(404, "Not found", "The entry with %s was not found." % entry_id))
 
             stopcomm(thiscommhandle)
 
