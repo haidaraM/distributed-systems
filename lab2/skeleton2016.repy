@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------   
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
-include election.repy
+#include election.repy
 
 
 def start_board():
