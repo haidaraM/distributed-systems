@@ -35,7 +35,7 @@ def send_election_message(neighbor_address, message, append=True):
             print "Retrying to send message from", mycontext['ip'], "to", neighbor_address, "Error:", (type(e), e)
 
     if not success:
-        print mycontext['ip'], "could not send election message t", neighbor_address, "after", max_retry, "retries"
+        print mycontext['ip'], "could not send election message to", neighbor_address, "after", max_retry, "retries"
 
 
 def begin_election():

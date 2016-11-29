@@ -75,7 +75,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
             other_requests_handler(msgheader, sockobj, thiscommhandle)
-            print '****Request:\n%s\n****' % msgheader
+            #print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
             got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip)
@@ -193,12 +193,14 @@ def send_msg_to_neighbors(msg_type, entry_message, entry_creator_ip, entry_seque
 
     for neighbor in mycontext['neighbors']:
         if neighbor != my_ip:  # I don't send a msg to myself
-
-            print "Opening connection to", neighbor, "on port"
-            sockojb = openconn(neighbor, my_port)
-            print "Successful connection to", neighbor
-            sockojb.send(msg_to_send)
-            sockojb.close()
+            try:
+                print "Opening connection to", neighbor, "on port"
+                sockojb = openconn(neighbor, my_port)
+                print "Successful connection to", neighbor
+                sockojb.send(msg_to_send)
+                sockojb.close()
+            except Exception, exception:
+                print "Could not send message to", neighbor, "Error :", str(exception)
 
 
 def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
@@ -447,6 +449,9 @@ if callfunc == 'initialize':
     mycontext['entries'] = []
     mycontext['last_sequence_number'] = 0
 
+    # History of updates to apply in case we have received a delete/modify for an entry that doesn't exist.
+    # This may happen if the vessel was down when the add message was sent.
+    mycontext['history'] = []
 
     # Initialize the neighbors
     mycontext['neighbors'] = []
