@@ -26,24 +26,15 @@ class Entry:
                                                                       self.sequence_number)
 
 
-def _entry_sequence_number(entry):
+def _entry_key(entry):
     """
-    Utility function used as a key to sort the entries by their sequence_number
-    :param entry:
-    :return:
-    """
-    return entry.sequence_number
-
-
-def _entry_creator_ip(entry):
-    """
-    Utility function used as a key to sort the entries by their creator_ip. The creator_ip is converted to number by
-    removing the dots
+    Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break the ties.
+    The creator_ip is converted to number by removing the dots
     :param entry:
     :return:
     """
     creator_ip = int(entry.creator_ip.replace(".", ""))
-    return creator_ip
+    return entry.sequence_number, creator_ip
 
 
 def sort_entries(entries):
@@ -52,9 +43,7 @@ def sort_entries(entries):
     :param entries: list of entries
     :return:
     """
-
-    entries.sort(key=_entry_sequence_number)
-    entries.sort(key=_entry_creator_ip)
+    entries.sort(key=_entry_key)
 
     return entries
 
@@ -233,6 +222,9 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
 
         entry_creator_ip = neighbor_ip  # here we could also get the creator ip from the message
         entry_message = splitted_msg[3]
+
+        # we increment the sequence number
+        get_next_sequence_number()
 
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message, creator_ip=entry_creator_ip)
 
