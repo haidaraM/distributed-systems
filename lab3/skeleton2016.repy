@@ -1,9 +1,4 @@
-# FEEL FREE TO CHANGE THE CODE. 
-# This is just a dull example
-
-# ------------------------------------------------------------------------------   
-# Start listening and handle incoming connections in board() function
-# ------------------------------------------------------------------------------
+# Implementation of lab3
 
 
 class Entry:
@@ -29,7 +24,7 @@ class Entry:
 def _entry_key(entry):
     """
     Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break the ties.
-    The creator_ip is converted to number by removing the dots
+    The creator_ip is converted to number
     :param entry:
     :return:
     """
@@ -39,7 +34,7 @@ def _entry_key(entry):
 
 def sort_entries(entries):
     """
-    This fonction sort the entries by their sequence_number and then by their creator_ip
+    This function sorts the entries by their sequence_number and then by their creator_ip
     :param entries: list of entries
     :return:
     """
@@ -49,6 +44,10 @@ def sort_entries(entries):
 
 
 def start_board():
+    """
+    Start listening and handle incoming connections in board() function
+    :return:
+    """
     my_ip = mycontext['ip']
     my_port = mycontext['port']
     print "Listening on IP " + str(my_ip) + " port " + str(my_port)
@@ -110,6 +109,7 @@ def delete_entry(entry_sequence_number, creator_ip):
             return True
         counter += 1
 
+    print "Tried to delete an entry which is not present anymore"
     return False
 
 
@@ -129,6 +129,7 @@ def modify_entry(entry_sequence_number, entry_creator_ip, entry_message):
             return True
         counter += 1
 
+    print "Tried to modify an entry which is not present anymore"
     return False
 
 
@@ -235,7 +236,6 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         if res:  # we have successfully deleted the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
-            print "Tried to delete an entry which is not present anymore"
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
@@ -248,7 +248,6 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         if res:  # we have successfully modified the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
-            print "Tried to modify an entry which is not present anymore"
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
@@ -444,9 +443,10 @@ if callfunc == 'initialize':
     mycontext['frontpage_header_template'] = file("board_frontpage_header_template.html").read()
     mycontext['frontpage_footer_template'] = file("board_frontpage_footer_template.html").read()
 
-    # Initialize the entries dict and first id
+    # Initialize the entries list and first sequence_number
     mycontext['entries'] = []
     mycontext['last_sequence_number'] = 0
+
 
     # Initialize the neighbors
     mycontext['neighbors'] = []
@@ -454,6 +454,7 @@ if callfunc == 'initialize':
     for line in file("neighborlist.txt", "r"):
         mycontext['neighbors'].append(line.strip())
 
+    # clock used when we want to add/delete/modify entries
     mycontext['entry_lock'] = getlock()
 
     mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
