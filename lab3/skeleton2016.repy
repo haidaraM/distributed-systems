@@ -20,8 +20,8 @@ class Entry:
         self.creator_ip = creator_ip
 
     def __str__(self):
-        return "'{0}' created by {1} with sequence number {2}".format(self.entry_message, self.sequence_number,
-                                                                      self.sequence_number)
+        return "Entry '{0}' created by {1} with sequence number {2}".format(self.entry_message, self.sequence_number,
+                                                                            self.sequence_number)
 
     def id(self):
         return int(str(self.sequence_number) + self.creator_ip.replace(".", ""))
@@ -47,6 +47,32 @@ def sort_entries(entries):
     entries.sort(key=_entry_key)
 
     return entries
+
+
+class EventualUpdate:
+    """
+    The class is used to store an eventual update that needs to be applied in the future. Depending on the context, an update may
+     not be applied.
+    """
+
+    def __init__(self, update_type, entry_sequence_number, entry_creator_ip, entry_message=None):
+        """
+
+        :param update_type: type of update : modify/delete
+        :param entry_sequence_number: the sequence number of the entry on which apply the update
+        :param entry_creator_ip: the ip address of the entry on which apply the update
+        :param entry_message: the message or text associated with the entry
+        """
+        self.update_type = update_type
+        self.entry_sequence_number = entry_sequence_number
+        self.entry_creator_ip = entry_creator_ip
+        self.entry_message = entry_message
+
+    def __str__(self):
+        return "Eventual update {0} to apply on entry {1} created by {2} ({3})".format(self.update_type,
+                                                                                       self.entry_sequence_number,
+                                                                                       self.entry_creator_ip,
+                                                                                       self.entry_message)
 
 
 def start_board():
@@ -241,9 +267,9 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     print(splitted_msg)
     msg_type = splitted_msg[0]
 
-    mycontext['entry_lock'].acquire()
-
     entry_sequence_number = int(splitted_msg[1])
+
+    mycontext['entry_lock'].acquire()
 
     if msg_type == "add":
 
@@ -262,6 +288,17 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         if res:  # we have successfully deleted the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
+
+            mycontext['history_lock'].acquire()
+            eventual_update = EventualUpdate(update_type="delete", entry_sequence_number=entry_sequence_number,
+                                             entry_creator_ip=entry_creator_ip)
+
+            print "Storing an eventual update :", eventual_update
+
+            mycontext['history'].append(eventual_update)
+
+            mycontext['history_lock'].release()
+
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
@@ -274,6 +311,17 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         if res:  # we have successfully modified the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
+
+            mycontext['history_lock'].acquire()
+            eventual_update = EventualUpdate(update_type="modify", entry_sequence_number=entry_sequence_number,
+                                             entry_creator_ip=entry_creator_ip, entry_message=entry_message)
+
+            print "Storing an eventual update :", eventual_update
+
+            mycontext['history'].append(eventual_update)
+
+            mycontext['history_lock'].release()
+
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
@@ -491,8 +539,11 @@ if callfunc == 'initialize':
     for line in file("neighborlist.txt", "r"):
         mycontext['neighbors'].append(line.strip())
 
-    # clock used when we want to add/delete/modify entries
+    # lock used when we want to add/delete/modify entries
     mycontext['entry_lock'] = getlock()
+
+    # lock used when we modify the history
+    mycontext['history_lock'] = getlock()
 
     mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
                            '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
