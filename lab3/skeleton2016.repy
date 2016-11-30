@@ -283,9 +283,9 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
 
     elif msg_type == "delete":
         entry_creator_ip = splitted_msg[2]  # here we have to get it from the message
-        res = delete_entry(entry_sequence_number, creator_ip=entry_creator_ip)
+        ok = delete_entry(entry_sequence_number, creator_ip=entry_creator_ip)
 
-        if res:  # we have successfully deleted the entry
+        if ok:  # we have successfully deleted the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
 
@@ -305,10 +305,10 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     elif msg_type == "modify":
         entry_creator_ip = splitted_msg[2]
         entry_message = splitted_msg[3]
-        res = modify_entry(entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip,
-                           entry_message=entry_message)
+        ok = modify_entry(entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip,
+                          entry_message=entry_message)
 
-        if res:  # we have successfully modified the entry
+        if ok:  # we have successfully modified the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
 
@@ -377,9 +377,9 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
         if parameters['delete'] == '1':
             # We delete the entry
-            res = delete_entry(entry_sequence_number, entry_creator_ip)
+            ok = delete_entry(entry_sequence_number, entry_creator_ip)
 
-            if res:  # we have successfully deleted the entry
+            if ok:  # we have successfully deleted the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
                 sockobj.send(
@@ -387,16 +387,17 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
             stopcomm(thiscommhandle)
 
-            send_msg_to_neighbors("delete", entry_message=None, entry_creator_ip=entry_creator_ip,
-                                  entry_sequence_number=entry_sequence_number)
+            if ok:  # We send a message to the neighbors only if the deletion was successful
+                send_msg_to_neighbors("delete", entry_message=None, entry_creator_ip=entry_creator_ip,
+                                      entry_sequence_number=entry_sequence_number)
         else:
             # we modify the entry by replacing it with new entry
             print 'modify. New value : ', parameters['entry']
 
-            res = modify_entry(entry_sequence_number=entry_sequence_number, entry_message=parameters['entry'],
-                               entry_creator_ip=entry_creator_ip)
+            ok = modify_entry(entry_sequence_number=entry_sequence_number, entry_message=parameters['entry'],
+                              entry_creator_ip=entry_creator_ip)
 
-            if res:  # we have successfully modified the entry
+            if ok:  # we have successfully modified the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
                 sockobj.send(
@@ -404,8 +405,9 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
             stopcomm(thiscommhandle)
 
-            send_msg_to_neighbors("modify", entry_message=parameters['entry'],
-                                  entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip)
+            if ok:  # We send a message to the neighbors only if the modification was successful
+                send_msg_to_neighbors("modify", entry_message=parameters['entry'],
+                                      entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip)
 
 
 def make_http_response(status, status_text, htmlresponse):
