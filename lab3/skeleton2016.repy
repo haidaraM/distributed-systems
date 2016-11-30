@@ -40,7 +40,7 @@ def _entry_key(entry):
 
 def sort_entries(entries):
     """
-    This function sorts the entries by _entry_key function
+    Utility function to sort the entries by _entry_key function
     :param entries: list of entries
     :return:
     """
@@ -144,7 +144,17 @@ def modify_entry(entry_sequence_number, entry_creator_ip, entry_message):
         counter += 1
 
     print "Tried to modify an entry which is not present anymore"
+
     return False
+
+
+def update_last_sequence_number(new_sequence_number):
+    """
+    Updates the last sequence number
+    :param new_sequence_number:
+    :return:
+    """
+    mycontext['last_sequence_number'] = new_sequence_number
 
 
 def get_next_sequence_number():
@@ -240,10 +250,8 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         entry_creator_ip = neighbor_ip  # here we could also get the creator ip from the message
         entry_message = splitted_msg[3]
 
-        # we increment the sequence number even if we don't use it in this case. We do that because if this vessel has a
-        # lower ip, its next entry will appear before this entry (the entries are sorted by sequence_number first and
-        # then in case of equality, we use the ip address of the creator.
-        get_next_sequence_number()
+        # we update the sequence number by the one received
+        update_last_sequence_number(entry_sequence_number)
 
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message, creator_ip=entry_creator_ip)
 
