@@ -9,22 +9,28 @@ class Entry:
     """
 
     def __init__(self, creator_ip, sequence_number, entry_message):
+        """
+        Create a new entry
+        :param creator_ip: the ip address of the creator of the entry (with the dots)
+        :param sequence_number: the sequence number of the entry
+        :param entry_message: the message or text associated with this entry
+        """
         self.entry_message = entry_message
         self.sequence_number = sequence_number
         self.creator_ip = creator_ip
-
-    def id(self):
-        return int(str(self.sequence_number) + self.creator_ip.replace(".", ""))
 
     def __str__(self):
         return "'{0}' created by {1} with sequence number {2}".format(self.entry_message, self.sequence_number,
                                                                       self.sequence_number)
 
+    def id(self):
+        return int(str(self.sequence_number) + self.creator_ip.replace(".", ""))
+
 
 def _entry_key(entry):
     """
     Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break the ties.
-    The creator_ip is converted to number
+    The creator_ip is converted to number.
     :param entry:
     :return:
     """
@@ -34,7 +40,7 @@ def _entry_key(entry):
 
 def sort_entries(entries):
     """
-    This function sorts the entries by their sequence_number and then by their creator_ip
+    This function sorts the entries by _entry_key function
     :param entries: list of entries
     :return:
     """
@@ -53,17 +59,21 @@ def start_board():
     print "Listening on IP " + str(my_ip) + " port " + str(my_port)
     try:
         listencommhandle = waitforconn(my_ip, my_port, board_connection_handler)
-    except Exception, e:
-        print "Exception in start_board: %s, %s\n" % (type(e), e)
+    except Exception, exc:
+        print "Exception in start_board: %s, %s\n" % (type(exc), exc)
         raise
-        # pass
 
 
-# ------------------------------------------------------------------------------
-# Called when an incoming message is received. 
-# --> Important starting point
-# ------------------------------------------------------------------------------    
-def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle):
+def board_connection_handler(ip_address, port, sockobj, thiscommhandle, listencommhandle):
+    """
+    Called when an incoming message is received --> Important starting point
+    :param ip_address:
+    :param port:
+    :param sockobj:
+    :param thiscommhandle:
+    :param listencommhandle:
+    :return:
+    """
     try:
         msgheader = sockobj.recv(1024)  # Receive message
 
@@ -75,20 +85,24 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
             other_requests_handler(msgheader, sockobj, thiscommhandle)
-            #print '****Request:\n%s\n****' % msgheader
+            # print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
-            got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip)
+            got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address)
 
     except Exception, e:
         print "Exception in board: %s, %s\n" % (type(e), e)
         # raise
 
 
-# ------------------------------------------------------------------------------
-# Handles initial GET request from browser, outputs HTML string and closes socket.
-# ------------------------------------------------------------------------------
 def get_board_handler(msgheader, sockobj, thiscommhandle):
+    """
+    Handles initial GET request from browser, outputs HTML string and closes socket.
+    :param msgheader:
+    :param sockobj:
+    :param thiscommhandle:
+    :return:
+    """
     htmlresponse = generate_html_page()
     res = make_http_response(200, 'OK', htmlresponse)
     sockobj.send(res)
@@ -226,7 +240,9 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         entry_creator_ip = neighbor_ip  # here we could also get the creator ip from the message
         entry_message = splitted_msg[3]
 
-        # we increment the sequence number
+        # we increment the sequence number even if we don't use it in this case. We do that because if this vessel has a
+        # lower ip, its next entry will appear before this entry (the entries are sorted by sequence_number first and
+        # then in case of equality, we use the ip address of the creator.
         get_next_sequence_number()
 
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message, creator_ip=entry_creator_ip)
@@ -260,7 +276,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
 
 def other_requests_handler(msgheader, sockobj, thiscommhandle):
     """
-    Handles the post requests
+    Handles the POST requests.
     :param msgheader: the request header
     :param sockobj: the socket object
     :param thiscommhandle: the command handle created by the current connection
@@ -336,18 +352,25 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
                                   entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip)
 
 
-# ------------------------------------------------------------------------------
-# Wrap into HTTP headers
-# ------------------------------------------------------------------------------
 def make_http_response(status, status_text, htmlresponse):
+    """
+    Wrap into HTTP headers
+    :param status:
+    :param status_text:
+    :param htmlresponse:
+    :return:
+    """
     response_template = "HTTP/1.1 %d %s\r\nContent-type: text/html\r\nContent-length: %i\r\n\r\n%s"
     return response_template % (status, status_text, len(htmlresponse), htmlresponse)
 
 
-# ------------------------------------------------------------------------------
-# Utility function to extract the contents (payload) from HTTP request
-# ------------------------------------------------------------------------------
 def extract_http_request_contents(header):
+    """
+    Utility function to extract the contents (payload) from HTTP request
+    :param header:
+    :return:
+    """
+
     # find content length
     content_length = header.split('Content-Length: ')
 
@@ -365,12 +388,13 @@ def extract_http_request_contents(header):
     return contents
 
 
-# ------------------------------------------------------------------------------
-# Utility function to extract query parameter from HTML query
-# ------------------------------------------------------------------------------
 def extract_parameters_from_query(msg):
-    # extract the query parameters as a dictionary: {name:value}
-    # example input format: comment=aa&ip=127.0.0.1&port=63101&action=Delete
+    """
+    Utility function to extract query parameter from HTML query. Extracts the query parameters as a dictionary: {name:value}
+    :param msg: input to extract as dictionary. Format : comment=aa&ip=127.0.0.1&port=63101&action=Delete
+    :return:
+    """
+
     parameters = {}
     arr = msg.split('&')
     for a in arr:
@@ -395,11 +419,11 @@ def get_entries_in_html():
     return output
 
 
-# ------------------------------------------------------------------------------
-# Outputs the blackboard html 
-# ------------------------------------------------------------------------------   
 def generate_html_page():
-    # Initialize blackboard content
+    """
+    Outputs the blackboard html
+    :return:
+    """
 
     entries = get_entries_in_html()
 
