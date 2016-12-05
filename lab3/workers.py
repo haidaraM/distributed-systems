@@ -60,6 +60,6 @@ if __name__ == '__main__':
 
     nb_message_per_vessel = int(NB_MAX_MESSAGE / nb_vessel)
 
-    print("Sending {0} messages to each of {1} vessels : {2}".format(nb_message_per_vessel, nb_vessel, neighbortlist))
+    print("Sending {0} messages to each of the {1} vessels : {2}".format(nb_message_per_vessel, nb_vessel, neighbortlist))
     for vessel_ip in neighbortlist:
         PostThread(vessel_ip, DEFAULT_PORT, nb_message_per_vessel).start()

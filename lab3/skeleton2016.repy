@@ -20,17 +20,17 @@ class Entry:
         self.creator_ip = creator_ip
 
     def __str__(self):
-        return "Entry '{0}' created by {1} with sequence number {2}".format(self.entry_message, self.sequence_number,
-                                                                            self.sequence_number)
+        return "Entry '%s' created by %s with sequence number %d" % (self.entry_message, self.creator_ip,
+                                                                     self.sequence_number)
 
     def id(self):
-        return int(str(self.sequence_number) + self.creator_ip.replace(".", ""))
+        return str(self.sequence_number) + "_" + self.creator_ip
 
 
 def _entry_key(entry):
     """
-    Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break the ties.
-    The creator_ip is converted to number.
+    Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break
+    the ties. The creator_ip is converted to number.
     :param entry:
     :return:
     """
@@ -55,7 +55,8 @@ class EventualUpdate:
      not be applied.
     """
 
-    def __init__(self, update_type, entry_sequence_number, entry_creator_ip, entry_message=None):
+    def __init__(self, update_type, command_sequence_number, entry_sequence_number, entry_creator_ip,
+                 entry_message=None):
         """
 
         :param update_type: type of update : modify/delete
@@ -63,16 +64,16 @@ class EventualUpdate:
         :param entry_creator_ip: the ip address of the entry on which apply the update
         :param entry_message: the message or text associated with the entry
         """
+        self.command_sequence_number = command_sequence_number
         self.update_type = update_type
         self.entry_sequence_number = entry_sequence_number
         self.entry_creator_ip = entry_creator_ip
         self.entry_message = entry_message
 
     def __str__(self):
-        return "Eventual update {0} to apply on entry {1} created by {2} ({3})".format(self.update_type,
-                                                                                       self.entry_sequence_number,
-                                                                                       self.entry_creator_ip,
-                                                                                       self.entry_message)
+        return "Eventual update %s to apply on entry %d created by %s (%s) with command number %d" % (
+            self.update_type, self.entry_sequence_number, self.entry_creator_ip, self.entry_message,
+            self.command_sequence_number)
 
 
 def start_board():
@@ -110,8 +111,8 @@ def board_connection_handler(ip_address, port, sockobj, thiscommhandle, listenco
         if msgheader.startswith('GET'):
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
-            other_requests_handler(msgheader, sockobj, thiscommhandle)
             # print '****Request:\n%s\n****' % msgheader
+            post_requests_handler(msgheader, sockobj, thiscommhandle)
         else:  # if we are here, we received a message from another vessel
             # print '****Request:\n%s\n****' % msgheader
             got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address)
@@ -174,7 +175,7 @@ def modify_entry(entry_sequence_number, entry_creator_ip, entry_message):
     return False
 
 
-def update_last_sequence_number(new_sequence_number):
+def update_last_entry_sequence_number(new_sequence_number):
     """
     Updates the last sequence number
     :param new_sequence_number:
@@ -183,15 +184,26 @@ def update_last_sequence_number(new_sequence_number):
     mycontext['last_sequence_number'] = new_sequence_number
 
 
-def get_next_sequence_number():
+def get_next_entry_sequence_number():
     """
-    Returns the next sequence number and updates the last one
+    Returns the next entry sequence number and updates the last one
     :return:
     """
-    next_sequence_number = mycontext['last_sequence_number'] + 1
-    mycontext['last_sequence_number'] = next_sequence_number
+    next_entry_sequence_number = mycontext['last_sequence_number'] + 1
+    mycontext['last_sequence_number'] = next_entry_sequence_number
 
-    return next_sequence_number
+    return next_entry_sequence_number
+
+
+def get_next_command_sequence_number():
+    """
+    Returns the next command sequence number and updates the last one
+    :return:
+    """
+    next_command_sequence_number = mycontext['command_sequence_number'] + 1
+    mycontext['command_sequence_number'] = next_command_sequence_number
+
+    return next_command_sequence_number
 
 
 def add_entry(entry_message, entry_sequence_number, creator_ip=None):
@@ -211,19 +223,21 @@ def add_entry(entry_message, entry_sequence_number, creator_ip=None):
     return new_entry
 
 
-def send_msg_to_neighbors(msg_type, entry_message, entry_creator_ip, entry_sequence_number=-1):
+def send_msg_to_neighbors(msg_type, entry_message, entry_creator_ip, entry_sequence_number, command_sequence_number):
     """
     Sends a message to the neighbors telling them to add/delete/modify an entry.
     Here we define our API for the communication between the vessels. The messages sent have the following form.
 
     msg_type
+    command_sequence_number
     entry_sequence_number
     entry_creator_ip
-    entry_message
+    [entry_message]
 
     The first line is the message type that can be either "add", "delete" or "modify" to specify what to do with an entry.
     Depending on the first line (msg_type), the fourth line can be empty (when deleting).
 
+    :param command_sequence_number:
     :param entry_creator_ip:
     :param entry_message:
     :param msg_type
@@ -235,18 +249,20 @@ def send_msg_to_neighbors(msg_type, entry_message, entry_creator_ip, entry_seque
     my_ip = mycontext['ip']
 
     if msg_type == "add":
-        msg_to_send = "add\n%s\n%s\n%s" % (entry_sequence_number, entry_creator_ip, entry_message)
+        msg_to_send = "add\n%s\n%s\n%s\n%s" % (
+            command_sequence_number, entry_sequence_number, entry_creator_ip, entry_message)
     elif msg_type == "delete":
-        msg_to_send = "delete\n%s\n%s" % (entry_sequence_number, entry_creator_ip)
+        msg_to_send = "delete\n%s\n%s\n%s" % (command_sequence_number, entry_sequence_number, entry_creator_ip)
     else:
-        msg_to_send = "modify\n%s\n%s\n%s" % (entry_sequence_number, entry_creator_ip, entry_message)
+        msg_to_send = "modify\n%s\n%s\n%s\n%s" % (
+            command_sequence_number, entry_sequence_number, entry_creator_ip, entry_message)
 
     for neighbor in mycontext['neighbors']:
         if neighbor != my_ip:  # I don't send a msg to myself
             try:
-                print "Opening connection to", neighbor, "on port"
+                # print "Opening connection to", neighbor, "on port"
                 sockojb = openconn(neighbor, my_port)
-                print "Successful connection to", neighbor
+                # print "Successful connection to", neighbor
                 sockojb.send(msg_to_send)
                 sockojb.close()
             except Exception, exception:
@@ -264,47 +280,47 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     :return:
     """
     splitted_msg = msgheader.split("\n")
-    print(splitted_msg)
-    msg_type = splitted_msg[0]
+    print "************", msgheader,"************"
 
-    entry_sequence_number = int(splitted_msg[1])
+    msg_type = splitted_msg[0]
+    command_sequence_number = int(splitted_msg[1])
+    entry_sequence_number = int(splitted_msg[2])
 
     mycontext['entry_lock'].acquire()
 
     if msg_type == "add":
 
         entry_creator_ip = neighbor_ip  # here we could also get the creator ip from the message
-        entry_message = splitted_msg[3]
+        entry_message = splitted_msg[4]
 
         # we update the sequence number by the one received
-        update_last_sequence_number(entry_sequence_number)
+        update_last_entry_sequence_number(entry_sequence_number)
 
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message, creator_ip=entry_creator_ip)
 
     elif msg_type == "delete":
-        entry_creator_ip = splitted_msg[2]  # here we have to get it from the message
+        entry_creator_ip = splitted_msg[3]  # here we have to get it from the message
         ok = delete_entry(entry_sequence_number, creator_ip=entry_creator_ip)
 
         if ok:  # we have successfully deleted the entry
             sockobj.send(make_http_response(204, 'OK', ""))
-        else:  # the entry is not in the map, we return a 404
+        else:  # the entry is not in the map, we return a 404 and store an eventual update
 
-            mycontext['history_lock'].acquire()
+            # mycontext['history_lock'].acquire()
             eventual_update = EventualUpdate(update_type="delete", entry_sequence_number=entry_sequence_number,
-                                             entry_creator_ip=entry_creator_ip)
+                                             entry_creator_ip=entry_creator_ip,
+                                             command_sequence_number=command_sequence_number)
 
             print "Storing an eventual update :", eventual_update
 
-            mycontext['history'].append(eventual_update)
-
-            mycontext['history_lock'].release()
+            # mycontext['history'].append(eventual_update)
 
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
     elif msg_type == "modify":
-        entry_creator_ip = splitted_msg[2]
-        entry_message = splitted_msg[3]
+        entry_creator_ip = splitted_msg[3]
+        entry_message = splitted_msg[4]
         ok = modify_entry(entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip,
                           entry_message=entry_message)
 
@@ -312,15 +328,16 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
 
-            mycontext['history_lock'].acquire()
+            # mycontext['history_lock'].acquire()
             eventual_update = EventualUpdate(update_type="modify", entry_sequence_number=entry_sequence_number,
-                                             entry_creator_ip=entry_creator_ip, entry_message=entry_message)
+                                             entry_creator_ip=entry_creator_ip, entry_message=entry_message,
+                                             command_sequence_number=command_sequence_number)
 
             print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
 
-            mycontext['history_lock'].release()
+            # mycontext['history_lock'].release()
 
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
@@ -330,7 +347,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     stopcomm(thiscommhandle)
 
 
-def other_requests_handler(msgheader, sockobj, thiscommhandle):
+def post_requests_handler(msgheader, sockobj, thiscommhandle):
     """
     Handles the POST requests.
     :param msgheader: the request header
@@ -340,10 +357,10 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
     """
     # extract the query from the HTTP request
     query = extract_http_request_contents(msgheader)
-    print "query", query
+    # print "query", query
     # extract the query parameters
     parameters = extract_parameters_from_query(query)
-    print "parameters", parameters
+    # print "parameters", parameters
 
     # we split the url to get the URI
     splitted_header = msgheader.split()
@@ -355,21 +372,23 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
         # here we add a new entry and return the id of the newly created entry
         print "add. New value : ", parameters['entry']
 
-        # we get a lock here to prevent some problems
         mycontext['entry_lock'].acquire()
 
-        new_sequence_number = get_next_sequence_number()
+        new_sequence_number = get_next_entry_sequence_number()
+        command_sequence_number = get_next_command_sequence_number()
 
-        add_entry(entry_message=parameters['entry'], entry_sequence_number=new_sequence_number,
-                  creator_ip=mycontext['ip'])
+        new_entry = add_entry(entry_message=parameters['entry'], entry_sequence_number=new_sequence_number,
+                              creator_ip=mycontext['ip'])
+
+        sockobj.send(make_http_response(200, 'OK', str(new_entry.id()) + "\n"))
+
+        stopcomm(thiscommhandle)
 
         mycontext['entry_lock'].release()
 
-        sockobj.send(make_http_response(200, 'OK', str(new_sequence_number)))
-        stopcomm(thiscommhandle)
-
         send_msg_to_neighbors("add", entry_message=parameters['entry'], entry_creator_ip=mycontext['ip'],
-                              entry_sequence_number=new_sequence_number)
+                              entry_sequence_number=new_sequence_number,
+                              command_sequence_number=command_sequence_number)
 
     else:
         entry_sequence_number = int(uri.split('/')[2])
@@ -377,22 +396,39 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
 
         if parameters['delete'] == '1':
             # We delete the entry
+
+            mycontext['entry_lock'].acquire()
+
+            command_sequence_number = get_next_command_sequence_number()
+
+            print "Delete the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
+
             ok = delete_entry(entry_sequence_number, entry_creator_ip)
 
             if ok:  # we have successfully deleted the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
+                # TODO : store an eventual update
                 sockobj.send(
                     make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
             stopcomm(thiscommhandle)
 
+            mycontext['entry_lock'].release()
+
             if ok:  # We send a message to the neighbors only if the deletion was successful
                 send_msg_to_neighbors("delete", entry_message=None, entry_creator_ip=entry_creator_ip,
-                                      entry_sequence_number=entry_sequence_number)
+                                      entry_sequence_number=entry_sequence_number,
+                                      command_sequence_number=command_sequence_number)
         else:
-            # we modify the entry by replacing it with new entry
-            print 'modify. New value : ', parameters['entry']
+
+            mycontext['entry_lock'].acquire()
+
+            command_sequence_number = get_next_command_sequence_number()
+
+            # we modify the entry by replacing its value with new entry
+            print 'Modification of the entry %d_%s. The new value is : ' % (entry_sequence_number,
+                                                                            entry_creator_ip), parameters['entry']
 
             ok = modify_entry(entry_sequence_number=entry_sequence_number, entry_message=parameters['entry'],
                               entry_creator_ip=entry_creator_ip)
@@ -400,14 +436,18 @@ def other_requests_handler(msgheader, sockobj, thiscommhandle):
             if ok:  # we have successfully modified the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
+                # TODO : store an eventual update
                 sockobj.send(
                     make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
             stopcomm(thiscommhandle)
 
+            mycontext['entry_lock'].release()
+
             if ok:  # We send a message to the neighbors only if the modification was successful
                 send_msg_to_neighbors("modify", entry_message=parameters['entry'],
-                                      entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip)
+                                      entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip,
+                                      command_sequence_number=command_sequence_number)
 
 
 def make_http_response(status, status_text, htmlresponse):
@@ -530,6 +570,9 @@ if callfunc == 'initialize':
     # Initialize the entries list and first sequence_number
     mycontext['entries'] = []
     mycontext['last_sequence_number'] = 0
+
+    # sequence number associated to each command
+    mycontext['command_sequence_number'] = 0
 
     # History of updates to apply in case we have received a delete/modify for an entry that doesn't exist.
     # This may happen if the vessel was down when the add message was sent.
