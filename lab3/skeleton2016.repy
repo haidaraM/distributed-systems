@@ -175,35 +175,24 @@ def modify_entry(entry_sequence_number, entry_creator_ip, entry_message):
     return False
 
 
-def update_last_entry_sequence_number(new_sequence_number):
+def update_sequence_number(sequence_number_key, new_sequence_number):
     """
-    Updates the last sequence number
+    Updates the sequence number corresponding to the key
+    :param sequence_number_key:
     :param new_sequence_number:
     :return:
     """
-    mycontext['last_sequence_number'] = new_sequence_number
+    mycontext[sequence_number_key] = new_sequence_number
 
 
-def get_next_entry_sequence_number():
+def get_next_sequence_number(sequence_number_key):
     """
-    Returns the next entry sequence number and updates the last one
+    Returns the next sequence number of the sequence number corresponding to the key
+    :param sequence_number_key:
     :return:
     """
-    next_entry_sequence_number = mycontext['last_sequence_number'] + 1
-    mycontext['last_sequence_number'] = next_entry_sequence_number
-
-    return next_entry_sequence_number
-
-
-def get_next_command_sequence_number():
-    """
-    Returns the next command sequence number and updates the last one
-    :return:
-    """
-    next_command_sequence_number = mycontext['command_sequence_number'] + 1
-    mycontext['command_sequence_number'] = next_command_sequence_number
-
-    return next_command_sequence_number
+    mycontext[sequence_number_key] += 1
+    return mycontext[sequence_number_key]
 
 
 def add_entry(entry_message, entry_sequence_number, creator_ip=None):
@@ -280,7 +269,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     :return:
     """
     splitted_msg = msgheader.split("\n")
-    print "************", msgheader,"************"
+    print "************ \n", msgheader, "\n************"
 
     msg_type = splitted_msg[0]
     command_sequence_number = int(splitted_msg[1])
@@ -293,8 +282,8 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         entry_creator_ip = neighbor_ip  # here we could also get the creator ip from the message
         entry_message = splitted_msg[4]
 
-        # we update the sequence number by the one received
-        update_last_entry_sequence_number(entry_sequence_number)
+        # we update the entry sequence number by the one received
+        update_sequence_number('last_entry_sequence_number', entry_sequence_number)
 
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message, creator_ip=entry_creator_ip)
 
@@ -374,8 +363,8 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
         mycontext['entry_lock'].acquire()
 
-        new_sequence_number = get_next_entry_sequence_number()
-        command_sequence_number = get_next_command_sequence_number()
+        new_sequence_number = get_next_sequence_number('last_entry_sequence_number')
+        command_sequence_number = get_next_sequence_number('last_command_sequence_number')
 
         new_entry = add_entry(entry_message=parameters['entry'], entry_sequence_number=new_sequence_number,
                               creator_ip=mycontext['ip'])
@@ -399,7 +388,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
             mycontext['entry_lock'].acquire()
 
-            command_sequence_number = get_next_command_sequence_number()
+            command_sequence_number = get_next_sequence_number('last_command_sequence_number')
 
             print "Delete the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
 
@@ -424,7 +413,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
             mycontext['entry_lock'].acquire()
 
-            command_sequence_number = get_next_command_sequence_number()
+            command_sequence_number = get_next_sequence_number('last_command_sequence_number')
 
             # we modify the entry by replacing its value with new entry
             print 'Modification of the entry %d_%s. The new value is : ' % (entry_sequence_number,
@@ -569,10 +558,10 @@ if callfunc == 'initialize':
 
     # Initialize the entries list and first sequence_number
     mycontext['entries'] = []
-    mycontext['last_sequence_number'] = 0
+    mycontext['last_entry_sequence_number'] = 0
 
     # sequence number associated to each command
-    mycontext['command_sequence_number'] = 0
+    mycontext['last_command_sequence_number'] = 0
 
     # History of updates to apply in case we have received a delete/modify for an entry that doesn't exist.
     # This may happen if the vessel was down when the add message was sent.
