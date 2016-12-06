@@ -4,7 +4,7 @@
 # ------------------------------------------------------------------------------   
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
-#include election.repy
+include election.repy
 
 
 def start_board():
@@ -34,7 +34,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
         if msgheader.startswith('GET'):
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
-            other_requests_handler(msgheader, sockobj, thiscommhandle)
+            post_requests_handler(msgheader, sockobj, thiscommhandle)
             # print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received an election message
             #
@@ -101,12 +101,14 @@ def send_msg_to_neighbors(msg_to_send):
     my_ip = mycontext['ip']
     for neighbor in mycontext['neighbors']:
         if neighbor != my_ip:  # I don't send a msg to myself
-
-            # print "Opening connection to", neighbor, "on port"
-            sockojb = openconn(neighbor, my_port)
-            # print "Successful connection to", neighbor
-            sockojb.send(msg_to_send)
-            sockojb.close()
+            try:
+                # print "Opening connection to", neighbor, "on port"
+                sockojb = openconn(neighbor, my_port)
+                # print "Successful connection to", neighbor
+                sockojb.send(msg_to_send)
+                sockojb.close()
+            except Exception, exception:
+                print str(exception)
 
 
 def make_http_request(method, uri, parameters):
@@ -122,10 +124,9 @@ def make_http_request(method, uri, parameters):
     for key in parameters:
         query_string += str(key) + "=" + str(parameters[key]) + "&"
 
-    request_template = "{method} {uri} HTTP/1.1\r\nHost: {host}\r\nContent-Length: {content_length}\r\n{content}"
+    request_template = "%s %s HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\n%s"
 
-    return request_template.format(method=method, uri=uri, host=mycontext['ip'], content_length=len(query_string),
-                                   content=query_string)
+    return request_template % (method, uri, mycontext['ip'], len(query_string), query_string)
 
 
 def got_msg_from_a_vessel(msgheader):
@@ -166,7 +167,7 @@ def send_to_leader(message):
     sockojb.close()
 
 
-def other_requests_handler(msgheader, sockobj, thiscommhandle):
+def post_requests_handler(msgheader, sockobj, thiscommhandle):
     """
     Handles the post requests
     :param msgheader: the request header
