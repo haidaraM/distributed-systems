@@ -34,7 +34,10 @@ class PostThread(threading.Thread):
     def run(self):
         for i in range(self.nb_messages):
             # trying to simulate network latency
-            time.sleep(random.randint(1, 5))
+            waiting_time = random.randint(1, 5)
+            print "Waiting %d seconds before sending a new message to %s..." % (waiting_time, self.url)
+            time.sleep(waiting_time)
+
             subprocess.call(['curl', '--silent', '-d', 'entry=curl' + str(i), '-X', 'POST', self.url])
             # parameters = {'entry': 'message {0}'.format(i)}
             # ok = requests.post(self.url, data=parameters)
@@ -60,6 +63,7 @@ if __name__ == '__main__':
 
     nb_message_per_vessel = int(NB_MAX_MESSAGE / nb_vessel)
 
-    print("Sending {0} messages to each of the {1} vessels : {2}".format(nb_message_per_vessel, nb_vessel, neighbortlist))
+    print(
+        "Sending {0} messages to each of the {1} vessels : {2}".format(nb_message_per_vessel, nb_vessel, neighbortlist))
     for vessel_ip in neighbortlist:
         PostThread(vessel_ip, DEFAULT_PORT, nb_message_per_vessel).start()
