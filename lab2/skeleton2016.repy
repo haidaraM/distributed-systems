@@ -1,10 +1,8 @@
-# FEEL FREE TO CHANGE THE CODE. 
-# This is just a dull example
 
 # ------------------------------------------------------------------------------   
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
-include election.repy
+#include election.repy
 
 
 def start_board():
@@ -169,7 +167,8 @@ def send_to_leader(message):
 
 def post_requests_handler(msgheader, sockobj, thiscommhandle):
     """
-    Handles the post requests
+    Handles the post requests.
+    If the vessel is not the leader, the message is forwarded to the leader.
     :param msgheader: the request header
     :param sockobj: the socket object
     :param thiscommhandle: the command handle created by the current connection
@@ -231,9 +230,8 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
     else:  # here we have an uri like /entries/<entry_id> : delete or modify
         entry_id = uri.split('/')[2]
 
-        if parameters['delete'] == '1':
-
-            if am_i_the_leader():
+        if am_i_the_leader():
+            if parameters['delete'] == '1':
                 mycontext['entry_lock'].acquire()
 
                 delete_entry(int(entry_id))
@@ -246,11 +244,6 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
                 mycontext['entry_lock'].release()
             else:
-                request = make_http_request("POST", uri, parameters)
-                send_to_leader(request)
-        else:
-            # we modify the entry by replacing it with new entry
-            if am_i_the_leader():
                 mycontext['entry_lock'].acquire()
 
                 modify_entry(int(entry_id), parameters['entry'])
@@ -262,9 +255,9 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
                 send_msg_to_neighbors(request)
 
                 mycontext['entry_lock'].release()
-            else:
-                request = make_http_request("POST", uri, parameters)
-                send_to_leader(request)
+        else:
+            request = make_http_request("POST", uri, parameters)
+            send_to_leader(request)
 
         sockobj.send(make_http_response(204, 'OK', "Success"))
         stopcomm(thiscommhandle)

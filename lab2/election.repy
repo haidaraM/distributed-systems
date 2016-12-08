@@ -1,7 +1,6 @@
 def send_election_message(neighbor_address, message, append=True):
     """
     Send an election message the neighbor_address
-    :param nb_retry:
     :param neighbor_address:
     :param message:
     :param append:
