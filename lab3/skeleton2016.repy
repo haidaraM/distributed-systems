@@ -69,14 +69,16 @@ class EventualUpdate:
     """
 
     def __init__(self, update_type, message_sequence_number, message_creator_ip, entry_sequence_number,
-                 entry_creator_ip, entry_message=None):
+                 entry_creator_ip, entry_message=None, send_to_neighbor=False):
         """
 
         :param update_type: type of update : modify/delete
+        :param send_to_neighbor boolean to indicate if we have to send this update to the neighbors
         :param entry_sequence_number: the sequence number of the entry on which apply the update
         :param entry_creator_ip: the ip address of the entry on which apply the update
         :param entry_message: the message or text associated with the entry
         """
+        self.send_to_neighbor = send_to_neighbor
         self.message = Message(message_sequence_number, message_creator_ip)
         self.update_type = update_type
         self.entry_sequence_number = entry_sequence_number
@@ -84,7 +86,7 @@ class EventualUpdate:
         self.entry_message = entry_message
 
     def __str__(self):
-        return "'%s' to apply on entry '%d' created by %s (%s) with message number %d_%s" % (
+        return "'%s' to apply on entry the '%d_%s' (%s) with message number %d_%s" % (
             self.update_type, self.entry_sequence_number, self.entry_creator_ip, self.entry_message,
             self.message.sequence_number, self.message.creator_ip)
 
@@ -96,7 +98,7 @@ def start_board():
     """
     my_ip = mycontext['ip']
     my_port = mycontext['port']
-    print "Listening on IP " + str(my_ip) + " port " + str(my_port)
+    print "Listening on IP http://" + str(my_ip) + ":" + str(my_port)
     try:
         listencommhandle = waitforconn(my_ip, my_port, board_connection_handler)
     except Exception, exc:
@@ -179,6 +181,7 @@ def delete_entry(entry_sequence_number, entry_creator_ip):
     for entry in mycontext['entries']:
         if entry.sequence_number == entry_sequence_number and entry.creator_ip == entry_creator_ip:
             del mycontext['entries'][counter]
+            print "Deleted the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
             return True
         counter += 1
 
@@ -241,6 +244,8 @@ def get_next_sequence_number(sequence_number_key):
 def apply_pending_deletes(entry_sequence_number, entry_creator_ip):
     """
     Apply the pending deletes in the history that need to be applied to this entry
+    :param entry_creator_ip
+    :param entry_sequence_number
     :return:
     """
     counter = 0
@@ -250,7 +255,14 @@ def apply_pending_deletes(entry_sequence_number, entry_creator_ip):
                 # we delete the entry and the eventual update
                 delete_entry(entry_sequence_number, entry_creator_ip)
                 del mycontext['history'][counter]
-                print "Delete one eventual update %s" % str(eventual_update)
+                print "Deleted one eventual update %s" % str(eventual_update)
+
+                if eventual_update.send_to_neighbor:
+                    print "Sending the eventual update to be applied to the neighbors"
+                    send_msg_to_neighbors("delete", entry_message=None, entry_creator_ip=entry_creator_ip,
+                                          entry_sequence_number=entry_sequence_number,
+                                          message_sequence_number=eventual_update.message.sequence_number)
+
                 return
         counter += 1
 
@@ -272,7 +284,15 @@ def apply_pending_modifications(entry_sequence_number, entry_creator_ip):
                              message_sequence_number=eventual_update.message.sequence_number,
                              message_creator_ip=eventual_update.message.creator_ip)
                 del mycontext['history'][counter]
-                print "Delete one eventual update %s" % str(eventual_update)
+                print "Deleted one eventual update %s" % str(eventual_update)
+
+                if eventual_update.send_to_neighbor:
+                    print "Sending the eventual update to be applied to the neighbors"
+                    send_msg_to_neighbors("modify", entry_message=eventual_update.entry_message,
+                                          entry_sequence_number=entry_sequence_number,
+                                          entry_creator_ip=entry_creator_ip,
+                                          message_sequence_number=eventual_update.message.sequence_number)
+
                 return
         counter += 1
 
@@ -334,14 +354,14 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     :return:
     """
     splitted_msg = msgheader.split("\n")
-    print "************ \n", msgheader, "\n************"
+    # print "************ \n", msgheader, "\n************"
 
     msg_type = splitted_msg[0]
     message_sequence_number = int(splitted_msg[1])
     entry_sequence_number = int(splitted_msg[2])
 
     # simulate network latency
-    #if mycontext['ip'] == "198.133.224.147" and msg_type == "add":
+    # if mycontext['ip'] == "198.133.224.147" and msg_type == "add":
     #    sleep(20)
 
     mycontext['entry_lock'].acquire()
@@ -360,7 +380,6 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         add_entry(entry_sequence_number=entry_sequence_number, entry_message=entry_message,
                   entry_creator_ip=entry_creator_ip, message_sequence_number=message_sequence_number)
 
-        # here are two case to cases to consider : Previously, you received a
         apply_pending_modifications(entry_sequence_number, entry_creator_ip)
         apply_pending_deletes(entry_sequence_number, entry_creator_ip)
 
@@ -372,12 +391,10 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404 and store an eventual update
 
-            # mycontext['history_lock'].acquire()
             eventual_update = EventualUpdate(update_type="delete", entry_sequence_number=entry_sequence_number,
                                              entry_creator_ip=entry_creator_ip,
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
-
             print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
@@ -465,6 +482,9 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
                               entry_sequence_number=new_sequence_number,
                               message_sequence_number=message_sequence_number)
 
+        apply_pending_modifications(new_sequence_number, mycontext['ip'])
+        apply_pending_deletes(new_sequence_number, mycontext['ip'])
+
     else:
         entry_sequence_number = int(uri.split('/')[2])
         entry_creator_ip = parameters['creator_ip']
@@ -474,14 +494,19 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
             mycontext['entry_lock'].acquire()
 
-            print "Delete the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
-
             ok = delete_entry(entry_sequence_number, entry_creator_ip)
 
             if ok:  # we have successfully deleted the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
-                # TODO : store an eventual update
+                eventual_update = EventualUpdate(update_type="delete", entry_sequence_number=entry_sequence_number,
+                                                 entry_creator_ip=entry_creator_ip,
+                                                 message_sequence_number=message_sequence_number,
+                                                 message_creator_ip=mycontext['ip'], send_to_neighbor=True)
+                print "Storing an eventual update :", eventual_update
+
+                mycontext['history'].append(eventual_update)
+
                 sockobj.send(
                     make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
@@ -508,7 +533,15 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
             if ok:  # we have successfully modified the entry
                 sockobj.send(make_http_response(204, 'OK', ""))
             else:  # the entry is not in the map, we return a 404
-                # TODO : store an eventual update
+                eventual_update = EventualUpdate(update_type="modify", entry_sequence_number=entry_sequence_number,
+                                                 entry_creator_ip=entry_creator_ip, entry_message=parameters['entry'],
+                                                 message_sequence_number=message_sequence_number,
+                                                 message_creator_ip=mycontext['ip'], send_to_neighbor=True)
+
+                print "Storing an eventual update :", eventual_update
+
+                mycontext['history'].append(eventual_update)
+
                 sockobj.send(
                     make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
 
