@@ -181,11 +181,11 @@ def delete_entry(entry_sequence_number, entry_creator_ip):
     for entry in mycontext['entries']:
         if entry.sequence_number == entry_sequence_number and entry.creator_ip == entry_creator_ip:
             del mycontext['entries'][counter]
-            print "Deleted the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
+            # print "Deleted the entry %d_%s" % (entry_sequence_number, entry_creator_ip)
             return True
         counter += 1
 
-    print "Tried to delete an entry which is not present anymore"
+    # print "Tried to delete an entry which is not present anymore"
     return False
 
 
@@ -216,7 +216,7 @@ def modify_entry(entry_sequence_number, entry_creator_ip, entry_message, message
             return True
         counter += 1
 
-    print "Tried to modify an entry which is not present anymore"
+    # print "Tried to modify an entry which is not present anymore"
 
     return False
 
@@ -255,10 +255,10 @@ def apply_pending_deletes(entry_sequence_number, entry_creator_ip):
                 # we delete the entry and the eventual update
                 delete_entry(entry_sequence_number, entry_creator_ip)
                 del mycontext['history'][counter]
-                print "Deleted one eventual update %s" % str(eventual_update)
+                # print "Deleted one eventual update %s" % str(eventual_update)
 
                 if eventual_update.send_to_neighbor:
-                    print "Sending the eventual update to be applied to the neighbors"
+                    # print "Sending the eventual update to be applied to the neighbors"
                     send_msg_to_neighbors("delete", entry_message=None, entry_creator_ip=entry_creator_ip,
                                           entry_sequence_number=entry_sequence_number,
                                           message_sequence_number=eventual_update.message.sequence_number)
@@ -284,10 +284,10 @@ def apply_pending_modifications(entry_sequence_number, entry_creator_ip):
                              message_sequence_number=eventual_update.message.sequence_number,
                              message_creator_ip=eventual_update.message.creator_ip)
                 del mycontext['history'][counter]
-                print "Deleted one eventual update %s" % str(eventual_update)
+                # print "Deleted one eventual update %s" % str(eventual_update)
 
                 if eventual_update.send_to_neighbor:
-                    print "Sending the eventual update to be applied to the neighbors"
+                    #   print "Sending the eventual update to be applied to the neighbors"
                     send_msg_to_neighbors("modify", entry_message=eventual_update.entry_message,
                                           entry_sequence_number=entry_sequence_number,
                                           entry_creator_ip=entry_creator_ip,
@@ -353,6 +353,10 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     :param msgheader: message header
     :return:
     """
+
+    # Start the time for the measurements
+    start_timer()
+
     splitted_msg = msgheader.split("\n")
     # print "************ \n", msgheader, "\n************"
 
@@ -387,6 +391,12 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
         entry_creator_ip = splitted_msg[3]  # here we have to get it from the message
         ok = delete_entry(entry_sequence_number, entry_creator_ip)
 
+        # counter to stop the timer
+        mycontext['timer_lock'].acquire()
+        mycontext['nb_delete_messages_received'] += 1
+        finish_timer()
+        mycontext['timer_lock'].release()
+
         if ok:  # we have successfully deleted the entry
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404 and store an eventual update
@@ -395,7 +405,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
                                              entry_creator_ip=entry_creator_ip,
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
-            print "Storing an eventual update :", eventual_update
+            #print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
 
@@ -419,7 +429,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
 
-            print "Storing an eventual update :", eventual_update
+            #print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
 
@@ -441,6 +451,10 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
     :param thiscommhandle: the command handle created by the current connection
     :return:
     """
+
+    # Start the time for the measurements
+    start_timer()
+
     # extract the query from the HTTP request
     query = extract_http_request_contents(msgheader)
     # print "query", query
@@ -465,7 +479,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
         # here we add a new entry and return the id of the newly created entry
 
         mycontext['entry_lock'].acquire()
-        print "Add a new entry with value : ", parameters['entry']
+        # print "Add a new entry with value : ", parameters['entry']
 
         new_sequence_number = get_next_sequence_number('last_entry_sequence_number')
 
@@ -492,6 +506,12 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
         if parameters['delete'] == '1':
             # We delete the entry
 
+            # counter to stop the timer
+            mycontext['timer_lock'].acquire()
+            mycontext['nb_delete_messages_received'] += 1
+            finish_timer()
+            mycontext['timer_lock'].release()
+
             mycontext['entry_lock'].acquire()
 
             ok = delete_entry(entry_sequence_number, entry_creator_ip)
@@ -503,7 +523,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
                                                  entry_creator_ip=entry_creator_ip,
                                                  message_sequence_number=message_sequence_number,
                                                  message_creator_ip=mycontext['ip'], send_to_neighbor=True)
-                print "Storing an eventual update :", eventual_update
+                # print "Storing an eventual update :", eventual_update
 
                 mycontext['history'].append(eventual_update)
 
@@ -523,8 +543,8 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
             mycontext['entry_lock'].acquire()
 
             # we modify the entry by replacing its value with new entry
-            print 'Modification of the entry %d_%s. The new value is : ' % (entry_sequence_number,
-                                                                            entry_creator_ip), parameters['entry']
+            # print 'Modification of the entry %d_%s. The new value is : ' % (entry_sequence_number,
+            #                                                                entry_creator_ip), parameters['entry']
 
             ok = modify_entry(entry_sequence_number=entry_sequence_number, entry_message=parameters['entry'],
                               entry_creator_ip=entry_creator_ip, message_sequence_number=message_sequence_number,
@@ -538,7 +558,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
                                                  message_sequence_number=message_sequence_number,
                                                  message_creator_ip=mycontext['ip'], send_to_neighbor=True)
 
-                print "Storing an eventual update :", eventual_update
+                # print "Storing an eventual update :", eventual_update
 
                 mycontext['history'].append(eventual_update)
 
@@ -639,7 +659,33 @@ def generate_html_page():
     return fullpage
 
 
-# ------------------------------------------------------------------------------    
+def start_timer():
+    """
+    Starts the timer for the measurements. The timer starts when we received the first message
+    :return:
+    """
+    if not mycontext['timer_started']:
+        mycontext['timer_started'] = True
+        mycontext['start_time'] = getruntime()
+
+
+def finish_timer():
+    nb_message_to_receive = 80
+
+    if not mycontext['timer_done']:
+        if mycontext['nb_delete_messages_received'] >= nb_message_to_receive:
+            end_time = getruntime()
+
+            elapsed_time = end_time - mycontext['start_time']
+            mycontext['timer_done'] = True
+            print "This vessel (%s) took %.2f seconds to reach consistency " % (mycontext['ip'], elapsed_time)
+            print "length of history % d" % len(mycontext['history'])
+        else:
+            #print "Timer not done : %d, %d " % (mycontext['nb_delete_messages_received'], len(mycontext['entries']))
+            pass
+
+
+# ------------------------------------------------------------------------------
 # Main entry point of the program. Initalizes global variables in mycontext
 # and calls start_board() which opens a socket for incoming connections.
 # ------------------------------------------------------------------------------
@@ -694,6 +740,12 @@ if callfunc == 'initialize':
 
     # lock used when we modify the history
     mycontext['history_lock'] = getlock()
+
+    # timer stuff for the measurements
+    mycontext['timer_started'] = False
+    mycontext['timer_done'] = False
+    mycontext['timer_lock'] = getlock()
+    mycontext['nb_delete_messages_received'] = 0
 
     mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
                            '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
