@@ -3,8 +3,8 @@ import random
 import subprocess
 import threading
 
-# number max of messages to send to all the vessels
-NB_MAX_MESSAGE = 15
+# number to send to each vessel
+NB_MESSAGE_PER_VESSEL = 20
 
 # the seattle port number
 DEFAULT_PORT = 63159
@@ -110,25 +110,22 @@ if __name__ == '__main__':
         print("No vessel on which post entries")
         exit(1)
 
-    nb_message_per_vessel = int(NB_MAX_MESSAGE / nb_vessel)
-
-    # we compute the real number of delete message
     global max_delete
-    max_delete = nb_message_per_vessel * nb_vessel
+    max_delete = NB_MESSAGE_PER_VESSEL * nb_vessel
 
     # Delete messages queues
     q = Queue.LifoQueue()
 
     print(
-        "Sending {0} messages to each of the {1} vessels : {2}".format(nb_message_per_vessel, nb_vessel, neighbortlist))
+        "Sending {0} messages to each vessels : {1}".format(NB_MESSAGE_PER_VESSEL, neighbortlist))
 
     # launch post threads
     for vessel_ip in neighbortlist:
-        post_thread = PostThread(vessel_ip, DEFAULT_PORT, nb_message_per_vessel, q)
+        post_thread = PostThread(vessel_ip, DEFAULT_PORT, NB_MESSAGE_PER_VESSEL, q)
         post_thread.start()
 
     delete_threads = []
-    # launch deleting thread
+    # launch delete thread
     for vessel_ip in reversed(neighbortlist):
         delete_thread = DeleteThread(vessel_ip, DEFAULT_PORT, q)
         delete_thread.start()
