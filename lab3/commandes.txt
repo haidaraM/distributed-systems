@@ -1,0 +1,13 @@
+loadkeys mouctar
+as mouctar
+browse
+on browsegood
+reset
+show ip to ../lab3/neighborlist.txt
+upload ../lab3/neighborlist.txt
+upload ../lab3/entry_template.html
+upload ../lab3/boardcontents_template.html
+upload ../lab3/board_frontpage_footer_template.html
+upload ../lab3/board_frontpage_header_template.html
+run ../lab3/skeleton2016.repy 63159
+list
