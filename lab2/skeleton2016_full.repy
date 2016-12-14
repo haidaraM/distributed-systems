@@ -1,5 +1,4 @@
-
-# ------------------------------------------------------------------------------   
+# ------------------------------------------------------------------------------
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
 #begin include election.repy
@@ -137,7 +136,7 @@ def board_connection_handler(ip, port, sockobj, thiscommhandle, listencommhandle
         if msgheader.startswith('GET'):
             get_board_handler(msgheader, sockobj, thiscommhandle)
         elif msgheader.startswith('POST'):  # the form has been submitted
-            post_requests_handler(msgheader, sockobj, thiscommhandle)
+            post_requests_handler(msgheader, sockobj, thiscommhandle, ip)
             # print '****Request:\n%s\n****' % msgheader
         else:  # if we are here, we received an election message
             #
@@ -167,9 +166,10 @@ def delete_entry(entry_id):
     """
     try:
         del mycontext['entries'][entry_id]
+        return True
     except KeyError:
-        # Nothing special to do here
-        pass
+        # print "Tried to delete en entry that doesn't exist"
+        return False
 
 
 def modify_entry(entry_id, entry):
@@ -182,6 +182,21 @@ def modify_entry(entry_id, entry):
 
     if entry_id in mycontext['entries']:
         mycontext['entries'][entry_id] = entry
+    else:
+        print "Tried to delete an entry that doesn't exist"
+
+def _entry_key(entry_key):
+    """
+    Utility function used as a key to sort the entries by their sequence_number and then by their creator_ip to break
+    the ties. The creator_ip is converted to number.
+    :param entry:
+    :return:
+    """
+    splited_id = entry_key.split('_')
+    sequence_number = int(splited_id[0])
+    creator_ip = splited_id[1]
+
+    return sequence_number, creator_ip
 
 
 def add_entry(entry_id, entry):
@@ -270,15 +285,18 @@ def send_to_leader(message):
     sockojb.close()
 
 
-def post_requests_handler(msgheader, sockobj, thiscommhandle):
+def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
     """
     Handles the post requests.
     If the vessel is not the leader, the message is forwarded to the leader.
+    :param ip_source:
     :param msgheader: the request header
     :param sockobj: the socket object
     :param thiscommhandle: the command handle created by the current connection
     :return:
     """
+    start_timer()
+
     # extract the query from the HTTP request
     query = extract_http_request_contents(msgheader)
     # print "query", query
@@ -297,13 +315,16 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
         if am_i_the_leader():
 
             mycontext['entry_lock'].acquire()
+            print "new entry"
             # generating the next new id
             next_id = mycontext['last_id'] + 1
+            entry_sequence_number = str(next_id) + "_" + mycontext['ip']
             mycontext['last_id'] = next_id
-            add_entry(next_id, parameters['entry'])
+            add_entry(entry_sequence_number, parameters['entry'])
 
             parameters['entry_id'] = next_id
             parameters['operation'] = "add"
+            parameters['creator_ip'] = mycontext['ip']
 
             request = make_http_request("POST", "/from_leader", parameters)
             send_msg_to_neighbors(request)
@@ -319,7 +340,9 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
     elif uri == "/from_leader":  # a non leader has received a message from the leader
         print "received message from leader"
         operation = parameters["operation"]
-        entry_id = int(parameters['entry_id'])
+        entry_sequence_number = int(parameters['entry_id'])
+        creator_ip = parameters['creator_ip']
+        entry_id = str(entry_sequence_number) + "_" + creator_ip
 
         mycontext['entry_lock'].acquire()
 
@@ -332,40 +355,47 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
         mycontext['entry_lock'].release()
 
-    else:  # here we have an uri like /entries/<entry_id> : delete or modify
-        entry_id = uri.split('/')[2]
+    else:  # here we have an uri like /entries/<entry_id> : delete or modify from the board
+        entry_sequence_number = uri.split('/')[2]
 
         if am_i_the_leader():
-            if parameters['delete'] == '1':
+            entry_id = str(entry_sequence_number) + "_" + parameters['creator_ip']
+            if parameters['delete'] == '1':  # deletion
                 mycontext['entry_lock'].acquire()
 
-                delete_entry(int(entry_id))
+                delete_entry(entry_id)
 
-                parameters['entry_id'] = entry_id
+                parameters['entry_id'] = entry_sequence_number
                 parameters['operation'] = "delete"
 
                 request = make_http_request("POST", "/from_leader", parameters)
                 send_msg_to_neighbors(request)
 
                 mycontext['entry_lock'].release()
-            else:
+            else:  # modification
                 mycontext['entry_lock'].acquire()
 
-                modify_entry(int(entry_id), parameters['entry'])
+                modify_entry(entry_id, parameters['entry'])
 
-                parameters['entry_id'] = entry_id
+                parameters['entry_id'] = entry_sequence_number
                 parameters['operation'] = "modify"
 
                 request = make_http_request("POST", "/from_leader", parameters)
                 send_msg_to_neighbors(request)
 
                 mycontext['entry_lock'].release()
+
         else:
             request = make_http_request("POST", uri, parameters)
             send_to_leader(request)
 
         sockobj.send(make_http_response(204, 'OK', "Success"))
         stopcomm(thiscommhandle)
+
+    mycontext['timer_lock'].acquire()
+    mycontext['nb_messages_received'] += 1
+    finish_timer()
+    mycontext['timer_lock'].release()
 
 
 # ------------------------------------------------------------------------------
@@ -419,9 +449,17 @@ def get_entries_in_html():
     """
     output = ""
 
-    for entry_id in mycontext['entries']:
+
+    key_list = mycontext['entries'].keys()
+    key_list.sort(key=_entry_key)
+
+
+    for entry_id in key_list:
         entry = mycontext['entries'][entry_id]
-        output += mycontext['entry_template'] % ('entries/%d' % entry_id, entry_id, entry)
+        splited_id = entry_id.split("_")
+        sequence_number = int(splited_id[0])
+        creator_ip = splited_id[1]
+        output += mycontext['entry_template'] % ('entries/%d' % sequence_number, entry_id, creator_ip, entry)
 
     return output
 
@@ -490,6 +528,41 @@ def initialize_context(my_ip, my_port):
     mycontext['leader_lock'] = getlock()
 
     mycontext['entry_lock'] = getlock()
+
+    # timer stuff for the measurements
+    mycontext['timer_started'] = False
+    mycontext['timer_done'] = False
+    mycontext['timer_lock'] = getlock()
+    mycontext['nb_messages_received'] = 0
+
+
+def start_timer():
+    """
+    Starts the timer for the measurements. The timer starts when we received the first message
+    :return:
+    """
+    if not mycontext['timer_started']:
+        mycontext['timer_started'] = True
+        mycontext['start_time'] = getruntime()
+
+
+def finish_timer():
+    nb_message_to_receive = 24
+
+    if not mycontext['timer_done']:
+        if mycontext['nb_messages_received'] >= nb_message_to_receive:
+            end_time = getruntime()
+
+            elapsed_time = end_time - mycontext['start_time']
+            mycontext['timer_done'] = True
+            print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
+                mycontext['ip'], elapsed_time, nb_message_to_receive)
+
+            mycontext['start_time'] = getruntime()
+            mycontext['timer_started'] = False
+        else:
+            # print "Timer not done : %d, %d " % (mycontext['nb_messages_received'], len(mycontext['entries']))
+            pass
 
 
 # ------------------------------------------------------------------------------

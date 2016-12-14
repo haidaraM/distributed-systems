@@ -1,7 +1,8 @@
 <form class="entryform form-inline" target="noreload-form-target" method="post" action="%s" style="padding-bottom: 5px">
     <!-- disabled field won’t be sent -->
     <div class="form-group">
-        <input type="text" class="form-control" name="id" value="%d" readonly disabled>
+        <input type="text" class="form-control" name="id" value="%s" readonly disabled>
+        <input type="hidden" name="creator_ip" value="%s"/>
     </div>
     <div class="form-group">
         <input type="text" class="form-control" name="entry" value="%s">
