@@ -228,7 +228,8 @@ def update_sequence_number(sequence_number_key, new_sequence_number):
     :param new_sequence_number:
     :return:
     """
-    mycontext[sequence_number_key] = new_sequence_number
+    if mycontext[sequence_number_key] < new_sequence_number:
+        mycontext[sequence_number_key] = new_sequence_number
 
 
 def get_next_sequence_number(sequence_number_key):
@@ -474,11 +475,11 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
     uri = splitted_header[1]
 
     # each request received from the board corresponds to a new message, so we get a new message sequence number
-    mycontext['entry_lock'].acquire()
+    mycontext['message_lock'].acquire()
 
     message_sequence_number = get_next_sequence_number('last_message_sequence_number')
 
-    mycontext['entry_lock'].release()
+    mycontext['message_lock'].release()
 
     if uri == "/entries":
         # here we add a new entry and return the id of the newly created entry
@@ -491,7 +492,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
         new_entry = add_entry(entry_message=parameters['entry'], entry_sequence_number=new_sequence_number,
                               entry_creator_ip=mycontext['ip'], message_sequence_number=message_sequence_number)
 
-        sockobj.send(make_http_response(200, 'OK', str(new_entry.id()) + "\n"))
+        sockobj.send(make_http_response(201, 'OK', str(new_entry.id()) + "\n"))
 
         stopcomm(thiscommhandle)
 
@@ -678,7 +679,7 @@ def finish_timer():
     nb_message_to_receive = 24
 
     if not mycontext['timer_done']:
-        if mycontext['nb_messages_received'] >= nb_message_to_receive:
+        if len(mycontext['entries']) == nb_message_to_receive:
             end_time = getruntime()
 
             elapsed_time = end_time - mycontext['start_time']
@@ -749,6 +750,9 @@ if callfunc == 'initialize':
 
     # lock used when we modify the history
     mycontext['history_lock'] = getlock()
+
+    # message number lock
+    mycontext['message_lock'] = getlock()
 
     # timer stuff for the measurements
     mycontext['timer_started'] = False
