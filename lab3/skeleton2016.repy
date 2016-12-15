@@ -424,17 +424,14 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
             sockobj.send(make_http_response(204, 'OK', ""))
         else:  # the entry is not in the map, we return a 404
 
-            # mycontext['history_lock'].acquire()
             eventual_update = EventualUpdate(update_type="modify", entry_sequence_number=entry_sequence_number,
                                              entry_creator_ip=entry_creator_ip, entry_message=entry_message,
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
 
             # print "Storing an eventual update :", eventual_update
-
             mycontext['history'].append(eventual_update)
 
-            # mycontext['history_lock'].release()
 
             sockobj.send(
                 make_http_response(404, "Not found", "The entry with %s was not found." % entry_sequence_number))
@@ -496,14 +493,14 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
         stopcomm(thiscommhandle)
 
+        apply_pending_modifications(new_sequence_number, mycontext['ip'])
+        apply_pending_deletes(new_sequence_number, mycontext['ip'])
+
         mycontext['entry_lock'].release()
 
         send_msg_to_neighbors("add", entry_message=parameters['entry'], entry_creator_ip=mycontext['ip'],
                               entry_sequence_number=new_sequence_number,
                               message_sequence_number=message_sequence_number)
-
-        apply_pending_modifications(new_sequence_number, mycontext['ip'])
-        apply_pending_deletes(new_sequence_number, mycontext['ip'])
 
     else:
         entry_sequence_number = int(uri.split('/')[2])
@@ -686,8 +683,9 @@ def finish_timer():
             mycontext['timer_done'] = True
             print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
                                                                     mycontext['ip'], elapsed_time, nb_message_to_receive)
-            print "length of history % d" % len(mycontext['history'])
+            print "Length of history % d" % len(mycontext['history'])
 
+            # reset the timer
             mycontext['start_time'] = getruntime()
             mycontext['timer_started'] = False
         else:
@@ -747,9 +745,6 @@ if callfunc == 'initialize':
 
     # lock used when we want to add/delete/modify entries
     mycontext['entry_lock'] = getlock()
-
-    # lock used when we modify the history
-    mycontext['history_lock'] = getlock()
 
     # message number lock
     mycontext['message_lock'] = getlock()
