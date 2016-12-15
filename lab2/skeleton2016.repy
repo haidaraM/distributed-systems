@@ -210,22 +210,29 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
         if am_i_the_leader():
 
             mycontext['entry_lock'].acquire()
-            print "new entry"
             # generating the next new id
             next_id = mycontext['last_id'] + 1
-            entry_sequence_number = str(next_id) + "_" + mycontext['ip']
             mycontext['last_id'] = next_id
-            add_entry(entry_sequence_number, parameters['entry'])
 
-            parameters['entry_id'] = next_id
+            if 'creator_ip' in parameters:
+                ip_entry = parameters['creator_ip']
+            else:
+                ip_entry = mycontext['ip']
+
+            entry_id = str(next_id) + "_" + ip_entry
+
+            add_entry(entry_id, parameters['entry'])
+
+            parameters['entry_id'] = entry_id
             parameters['operation'] = "add"
-            parameters['creator_ip'] = mycontext['ip']
+            parameters['creator_ip'] = ip_entry
 
             request = make_http_request("POST", "/from_leader", parameters)
             send_msg_to_neighbors(request)
 
             mycontext['entry_lock'].release()
         else:  # message received from the form => forward to the leader
+            parameters['creator_ip'] = mycontext['ip']
             request = make_http_request("POST", uri, parameters)
             send_to_leader(request)
 
@@ -233,11 +240,9 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
         stopcomm(thiscommhandle)
 
     elif uri == "/from_leader":  # a non leader has received a message from the leader
-        print "received message from leader"
+        #print "received message from leader"
         operation = parameters["operation"]
-        entry_sequence_number = int(parameters['entry_id'])
-        creator_ip = parameters['creator_ip']
-        entry_id = str(entry_sequence_number) + "_" + creator_ip
+        entry_id = parameters['entry_id']
 
         mycontext['entry_lock'].acquire()
 
@@ -260,7 +265,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
 
                 delete_entry(entry_id)
 
-                parameters['entry_id'] = entry_sequence_number
+                parameters['entry_id'] = entry_id
                 parameters['operation'] = "delete"
 
                 request = make_http_request("POST", "/from_leader", parameters)
@@ -272,7 +277,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
 
                 modify_entry(entry_id, parameters['entry'])
 
-                parameters['entry_id'] = entry_sequence_number
+                parameters['entry_id'] = entry_id
                 parameters['operation'] = "modify"
 
                 request = make_http_request("POST", "/from_leader", parameters)

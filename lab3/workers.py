@@ -4,10 +4,10 @@ import subprocess
 import threading
 
 # number to send to each vessel
-NB_MESSAGE_PER_VESSEL = 20
+NB_MESSAGE_PER_VESSEL = 12
 
 # the seattle port number
-DEFAULT_PORT = 63159
+DEFAULT_PORT = 63122
 
 NEIGHBORS_FILE_NAME = "neighborlist.txt"
 
@@ -41,18 +41,18 @@ class PostThread(threading.Thread):
             waiting_time = random.randint(1, 3)
             # print "Waiting %d seconds before sending a post to %s... " % (waiting_time, self.url)
             # time.sleep(waiting_time)
-            args = ['curl', '--silent', '-d', 'entry=' + str(i) + '_from_' + self.target_ip, '-X', 'POST', self.url]
+            args = ['curl', '--silent', '-d', 'entry=c' + str(i), '-X', 'POST', self.url]
+            print "Posting to %s..." % self.target_ip
+            subprocess.Popen(args=args, stdout=subprocess.PIPE)
+            #output, _ = res.communicate()
+            #if res.returncode == 0:
+            #    output = output.strip().split('_')
+            #    entry_id = output[0]
+            #    entry_creator_ip = output[1]
 
-            res = subprocess.Popen(args=args, stdout=subprocess.PIPE)
-            output, _ = res.communicate()
-            if res.returncode == 0:
-                output = output.strip().split('_')
-                entry_id = output[0]
-                entry_creator_ip = output[1]
-
-                if self.delete_queue is not None:
-                    # print "Adding entry %d_%s in the queue" % (int(entry_id), entry_creator_ip)
-                    self.delete_queue.put((entry_id, entry_creator_ip))
+            #    if self.delete_queue is not None:
+            #        # print "Adding entry %d_%s in the queue" % (int(entry_id), entry_creator_ip)
+            #        self.delete_queue.put((entry_id, entry_creator_ip))
 
 
 class DeleteThread(threading.Thread):
@@ -128,4 +128,4 @@ if __name__ == '__main__':
     # launch delete thread
     for vessel_ip in reversed(neighbortlist):
         delete_thread = DeleteThread(vessel_ip, DEFAULT_PORT, q)
-        delete_thread.start()
+        # delete_thread.start()

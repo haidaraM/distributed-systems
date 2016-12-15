@@ -1,5 +1,5 @@
-loadkeys mouctar
-as mouctar
+loadkeys elmhaidara
+as elmhaidara
 browse
 on browsegood
 reset
@@ -9,5 +9,5 @@ upload ../lab3/entry_template.html
 upload ../lab3/boardcontents_template.html
 upload ../lab3/board_frontpage_footer_template.html
 upload ../lab3/board_frontpage_header_template.html
-run ../lab3/skeleton2016.repy 63159
+run ../lab3/skeleton2016.repy 63122
 list

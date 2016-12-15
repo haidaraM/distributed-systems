@@ -354,7 +354,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     :return:
     """
 
-    # Start the time for the measurements
+    # Start the timer for the measurements
     start_timer()
 
     splitted_msg = msgheader.split("\n")
@@ -393,7 +393,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
 
         # counter to stop the timer
         mycontext['timer_lock'].acquire()
-        mycontext['nb_delete_messages_received'] += 1
+        mycontext['nb_messages_received'] += 1
         finish_timer()
         mycontext['timer_lock'].release()
 
@@ -405,7 +405,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
                                              entry_creator_ip=entry_creator_ip,
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
-            #print "Storing an eventual update :", eventual_update
+            # print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
 
@@ -429,7 +429,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
                                              message_sequence_number=message_sequence_number,
                                              message_creator_ip=neighbor_ip)
 
-            #print "Storing an eventual update :", eventual_update
+            # print "Storing an eventual update :", eventual_update
 
             mycontext['history'].append(eventual_update)
 
@@ -441,6 +441,11 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, neighbor_ip):
     mycontext['entry_lock'].release()
 
     stopcomm(thiscommhandle)
+
+    mycontext['timer_lock'].acquire()
+    mycontext['nb_messages_received'] += 1
+    finish_timer()
+    mycontext['timer_lock'].release()
 
 
 def post_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -507,10 +512,6 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
             # We delete the entry
 
             # counter to stop the timer
-            mycontext['timer_lock'].acquire()
-            mycontext['nb_delete_messages_received'] += 1
-            finish_timer()
-            mycontext['timer_lock'].release()
 
             mycontext['entry_lock'].acquire()
 
@@ -573,6 +574,10 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
                 send_msg_to_neighbors("modify", entry_message=parameters['entry'],
                                       entry_sequence_number=entry_sequence_number, entry_creator_ip=entry_creator_ip,
                                       message_sequence_number=message_sequence_number)
+    mycontext['timer_lock'].acquire()
+    mycontext['nb_messages_received'] += 1
+    finish_timer()
+    mycontext['timer_lock'].release()
 
 
 def make_http_response(status, status_text, htmlresponse):
@@ -670,18 +675,22 @@ def start_timer():
 
 
 def finish_timer():
-    nb_message_to_receive = 80
+    nb_message_to_receive = 24
 
     if not mycontext['timer_done']:
-        if mycontext['nb_delete_messages_received'] >= nb_message_to_receive:
+        if mycontext['nb_messages_received'] >= nb_message_to_receive:
             end_time = getruntime()
 
             elapsed_time = end_time - mycontext['start_time']
             mycontext['timer_done'] = True
-            print "This vessel (%s) took %.2f seconds to reach consistency " % (mycontext['ip'], elapsed_time)
+            print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
+                                                                    mycontext['ip'], elapsed_time, nb_message_to_receive)
             print "length of history % d" % len(mycontext['history'])
+
+            mycontext['start_time'] = getruntime()
+            mycontext['timer_started'] = False
         else:
-            #print "Timer not done : %d, %d " % (mycontext['nb_delete_messages_received'], len(mycontext['entries']))
+            # print "Timer not done : %d, %d " % (mycontext['nb_messages_received'], len(mycontext['entries']))
             pass
 
 
@@ -745,7 +754,7 @@ if callfunc == 'initialize':
     mycontext['timer_started'] = False
     mycontext['timer_done'] = False
     mycontext['timer_lock'] = getlock()
-    mycontext['nb_delete_messages_received'] = 0
+    mycontext['nb_messages_received'] = 0
 
     mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
                            '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'

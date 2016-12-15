@@ -1,15 +1,9 @@
 <form class="entryform form-inline" target="noreload-form-target" method="post" action="%s" style="padding-bottom: 5px">
-    <!-- disabled field won’t be sent -->
-    <div class="form-group">
-        <input type="text" class="form-control" name="id" value="%s" readonly disabled>
-        <input type="hidden" name="creator_ip" value="%s"/>
-    </div>
-    <div class="form-group">
-        <input type="text" class="form-control" name="entry" value="%s">
-    </div>
-    <div class="form-group">
 
-        <button type="submit" name="delete" value="0" class="btn btn-default">Modify</button>
-        <button type="submit" name="delete" value="1" class="btn btn-danger">X</button>
-    </div>
+    <input type="text" class="form-control" name="id" value="%s" readonly disabled>
+    <input type="hidden" name="creator_ip" value="%s"/>
+    <input type="text" class="form-control" name="entry" value="%s">
+    <button type="submit" name="delete" value="0" class="btn btn-default">Modify</button>
+    <button type="submit" name="delete" value="1" class="btn btn-danger">X</button>
+
 </form>
