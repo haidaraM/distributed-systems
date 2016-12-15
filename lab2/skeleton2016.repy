@@ -433,6 +433,7 @@ def initialize_context(my_ip, my_port):
     mycontext['timer_done'] = False
     mycontext['timer_lock'] = getlock()
     mycontext['nb_messages_received'] = 0
+    mycontext['nb_messages_to_receive'] = 12 * len(mycontext['neighbors'])
 
 
 def start_timer():
@@ -446,16 +447,16 @@ def start_timer():
 
 
 def finish_timer():
-    nb_message_to_receive = 24
+    nb_of_entries_to_received = mycontext['nb_messages_to_receive']
 
     if not mycontext['timer_done']:
-        if mycontext['nb_messages_received'] >= nb_message_to_receive:
+        if len(mycontext['entries']) == nb_of_entries_to_received:
             end_time = getruntime()
 
             elapsed_time = end_time - mycontext['start_time']
             mycontext['timer_done'] = True
             print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
-                mycontext['ip'], elapsed_time, nb_message_to_receive)
+                mycontext['ip'], elapsed_time, nb_of_entries_to_received)
 
             mycontext['start_time'] = getruntime()
             mycontext['timer_started'] = False

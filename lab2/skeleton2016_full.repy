@@ -24,8 +24,6 @@ def send_election_message(neighbor_address, message, append=True):
 
             sockobj = openconn(neighbor_address, mycontext['port'])
 
-            print mycontext['ip'], "sending message to", neighbor_address
-
             sockobj.send(new_msg)
 
             success = True
@@ -69,7 +67,7 @@ def process_election_message(message):
             neighbor_ids.append(int(neighbor_id))
             neighbor_ips.append(neighbor_ip)
 
-    print "Election message received. Neighbors ids : %s. Ip addresses : %s" % (neighbor_ids, neighbor_ips)
+    #print "Election message received. Neighbors ids : %s. Ip addresses : %s" % (neighbor_ids, neighbor_ips)
 
     if neighbor_ids[0] == mycontext['my_id']:  # if the first id is mine, the ring is done
 
@@ -79,7 +77,7 @@ def process_election_message(message):
         # This part is critical because it can be accessed by multiple threads at the same time
         leader_id = max(neighbor_ids)
         leader_ip = neighbor_ips[neighbor_ids.index(leader_id)]
-        print "The id of the leader is %d with ip %s" % (leader_id, leader_ip)
+        #print "The id of the leader is %d with ip %s" % (leader_id, leader_ip)
         mycontext['leader_lock'].acquire()
         mycontext['leader_id'] = leader_id
         mycontext['leader_ip'] = leader_ip
@@ -538,6 +536,7 @@ def initialize_context(my_ip, my_port):
     mycontext['timer_done'] = False
     mycontext['timer_lock'] = getlock()
     mycontext['nb_messages_received'] = 0
+    mycontext['nb_messages_to_receive'] = 12 * len(mycontext['neighbors'])
 
 
 def start_timer():
@@ -551,16 +550,17 @@ def start_timer():
 
 
 def finish_timer():
-    nb_message_to_receive = 24
+    nb_of_entries_to_received = mycontext['nb_messages_to_receive']
 
     if not mycontext['timer_done']:
-        if mycontext['nb_messages_received'] >= nb_message_to_receive:
+        if len(mycontext['entries']) == nb_of_entries_to_received:
             end_time = getruntime()
 
             elapsed_time = end_time - mycontext['start_time']
             mycontext['timer_done'] = True
             print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
-                mycontext['ip'], elapsed_time, nb_message_to_receive)
+                mycontext['ip'], elapsed_time, nb_of_entries_to_received)
+            print "Number of entries %d" % len(mycontext['entries'])
 
             mycontext['start_time'] = getruntime()
             mycontext['timer_started'] = False
