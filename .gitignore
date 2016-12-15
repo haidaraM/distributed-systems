@@ -146,7 +146,8 @@ xmlrpc_common_repy.py
 ntp_time_repy.py
 
 # my keys
-mouctar.privatekey                                                                                                                                 
-mouctar.publickey 
+*.privatekey
+*.publickey
 test_multiple_instances.html
+*.tmp
 ~$*
