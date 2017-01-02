@@ -24,6 +24,8 @@ def send_election_message(neighbor_address, message, append=True):
 
             sockobj = openconn(neighbor_address, mycontext['port'])
 
+            #print mycontext['ip'], "sending message to", neighbor_address
+
             sockobj.send(new_msg)
 
             success = True
@@ -560,7 +562,6 @@ def finish_timer():
             mycontext['timer_done'] = True
             print "This vessel (%s) took %.2f seconds to reach consistency with %d messages" % (
                 mycontext['ip'], elapsed_time, nb_of_entries_to_received)
-            print "Number of entries %d" % len(mycontext['entries'])
 
             mycontext['start_time'] = getruntime()
             mycontext['timer_started'] = False
@@ -605,6 +606,6 @@ if callfunc == 'initialize':
 
     # begins election
     # wait a couple of secondes before starting the election
-    mycontext['election_timer'] = settimer(8, begin_election, ())
+    mycontext['election_timer'] = settimer(10, begin_election, ())
     # begin_election()
 
