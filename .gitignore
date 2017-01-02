@@ -151,3 +151,4 @@ ntp_time_repy.py
 test_multiple_instances.html
 *.tmp
 ~$*
+/lab3/report/
