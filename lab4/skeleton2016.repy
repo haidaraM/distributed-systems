@@ -105,12 +105,65 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle):
 
     print "Post uri : ", uri
 
+    if uri == "/vote/attack":  # I suggest to attack (I'm not a byzantine)
+        vote = True
+        mycontext['votes_vector_lock'].acquire()
+        mycontext['votes_vector'].append(vote)
+        mycontext['votes_vector_lock'].release()
+
+        # sending the vote to the other generals
+        msg_type = 'vote'
+        msg_to_send = msg_type + "\n" + str(vote)
+
+        send_msg_to_neighbors(msg_to_send)
+
+    elif uri == "/vote/retreat":  # I suggest to retreat (I'm not a byzantine)
+        vote = False
+        mycontext['votes_vector_lock'].acquire()
+        mycontext['votes_vector'].append(vote)
+        mycontext['votes_vector_lock'].release()
+
+        # sending the vote to the other generals
+        msg_type = 'vote'
+        msg_to_send = msg_type + "\n" + str(vote)
+
+        send_msg_to_neighbors(msg_to_send)
+
+    elif uri == "/vote/byzantine":  # I'm a byzantine
+        mycontext['byzantine'] = True
+
+    res = make_http_response(200, 'OK', "Success")
+    sockobj.send(res)
+
     stopcomm(thiscommhandle)
 
 
+def i_am_a_byzantine():
+    """
+    Return True if this general is a byzantine
+    :return:
+    """
+    return mycontext['byzantine']
+
+
 def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
-    # Do nothing for the moment
-    pass
+    splitted_msg = msgheader.split("\n")
+
+    msg_type = splitted_msg[0]
+
+    if msg_type == "vote":
+        if splitted_msg[1] == "True":
+            vote = True
+        else:
+            vote = False
+        mycontext['votes_vector_lock'].acquire()
+        mycontext['votes_vector'].append(vote)
+        mycontext['votes_vector_lock'].release()
+
+    res = make_http_response(200, 'OK', "Success")
+    sockobj.send(res)
+
+    stopcomm(thiscommhandle)
 
 
 def get_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -133,7 +186,8 @@ def get_requests_handler(msgheader, sockobj, thiscommhandle):
         htmlresponse = generate_html_page()
     elif uri == "/vote/result":
         # TODO : return the result
-        htmlresponse = mycontext['vote_result_template'] % "Voting Results ..."
+        msg = "Voting Results ... %s " % mycontext['votes_vector']
+        htmlresponse = mycontext['vote_result_template'] % msg
     res = make_http_response(200, 'OK', htmlresponse)
     sockobj.send(res)
     stopcomm(thiscommhandle)
@@ -144,7 +198,7 @@ def generate_html_page():
     Return the html page to display
     :return:
     """
-    # Initialize blackboard content
+
     return mycontext['vote_frontpage_template']
 
 
@@ -200,6 +254,68 @@ def extract_parameters_from_query(msg):
     return parameters
 
 
+def send_msg_to_neighbors(msg_to_send):
+    """
+    Send a msg to the neighbors.
+    The messages sent have the following schema:
+
+    msgtype
+    [the_vote]
+
+    The msgtype can be : 'vote', ... . If 'vote', the second line should the vote i.e. True for 'Attack' or False for
+    'Retreat'.
+
+    :param msg_to_send the message to send
+    :return:
+    """
+
+    my_port = mycontext['port']
+    my_ip = mycontext['ip']
+    for neighbor in mycontext['neighbors']:
+        if neighbor != my_ip:  # I don't send a msg to myself
+            try:
+                # print "Opening connection to", neighbor, "on port"
+                sockojb = openconn(neighbor, my_port)
+                # print "Successful connection to", neighbor
+                sockojb.send(msg_to_send)
+                sockojb.close()
+            except Exception, exception:
+                print str(exception)
+
+
+def initialize_context(my_ip, my_port):
+    """
+    Initializes the context by putting the necessary variables in the mycontext
+    :return:
+    """
+
+    # Initialize Port and IP
+    mycontext['port'] = my_port
+    mycontext['ip'] = my_ip
+
+    # read html template files
+    mycontext['vote_frontpage_template'] = file("vote_frontpage_template.html").read()
+    mycontext['vote_result_template'] = file("vote_result_template.html").read()
+
+    # list of the neighbors
+    mycontext['neighbors'] = []
+
+    # Initialize the neighbors
+    for line in file("neighborlist.txt", "r"):
+        mycontext['neighbors'].append(line.strip())
+
+    # boolean to indicate if this general (vessel) if byzantine or not
+    mycontext['byzantine'] = False
+
+    # stock the vote of each general
+    mycontext['votes_vector'] = []
+
+    mycontext['votes_vector_lock'] = getlock()
+
+    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
+                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
+
+
 # ------------------------------------------------------------------------------
 # Main entry point of the program. Initalizes global variables in mycontext
 # and calls start_board() which opens a socket for incoming connections.
@@ -223,23 +339,8 @@ if callfunc == 'initialize':
         raise Exception(
             "Usage: python <path to repy.py> <path to restrictions.default> skeleton2016.repy <port> [ip (optional)]")
 
-    # Initialize Port and IP
-    mycontext['port'] = port
-    mycontext['ip'] = ip
-
-    # read html template files
-    # read html template files
-    mycontext['vote_frontpage_template'] = file("vote_frontpage_template.html").read()
-    mycontext['vote_result_template'] = file("vote_result_template.html").read()
-
-    # Initialize the neighbors
-    mycontext['neighbors'] = []
-
-    for line in file("neighborlist.txt", "r"):
-        mycontext['neighbors'].append(line.strip())
-
-    mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
-                           '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
+    # Context initialization
+    initialize_context(ip, port)
 
     # e = Exception("ex");
     # try:

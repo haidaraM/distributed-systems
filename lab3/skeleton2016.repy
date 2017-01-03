@@ -303,7 +303,7 @@ def apply_pending_modifications(entry_sequence_number, entry_creator_ip):
 def send_msg_to_neighbors(msg_type, entry_text, entry_creator_ip, entry_sequence_number, message_sequence_number):
     """
     Sends a message to the neighbors telling them to add/delete/modify an entry.
-    Here we define our API for the communication between the vessels. The messages sent have the following schema.
+    Here we define our API for the communication between the vessels. The messages sent have the following schema:
 
     msg_type
     message_sequence_number

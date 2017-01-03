@@ -50,6 +50,21 @@
         });
     </script>
 
+    <!-- my personal script -->
+    <script>
+        $(document).ready(function () {
+            $("#usrform").find("button").click(function (event) {
+                event.preventDefault();
+
+                $(this).unbind('click').click();
+                $(this).attr('disabled', true);
+
+                $(this).siblings().attr('disabled', true);
+            });
+        });
+
+    </script>
+
     <title>Byzantine Agreement - TDA596 (Chalmers)</title>
 </head>
 <body class="container">
@@ -65,8 +80,8 @@ An error shown here means the server is not responding -->
 
 <!-- This place shows the buttons used to request a vote -->
 <div id="vote_form_placeholder">
-    <h3>Vote</h3>
-    <form id="usrform" target="noreload-form-target">
+    <h3 id="vote">Vote</h3>
+    <form id="usrform" target="noreload-form-target" class="form-inline">
         <button type="submit" class="btn btn-danger" formmethod="post" formaction="/vote/attack">
             <i class="fa fa-fire" aria-hidden="true"></i> Attack
         </button>
