@@ -60,6 +60,11 @@
                 $(this).attr('disabled', true);
 
                 $(this).siblings().attr('disabled', true);
+
+                // if byzantine, I display a little message on the page
+                if ($(this).attr('id') == "byzantine-btn") {
+                    $("#vote").text("Vote (Byzantine)");
+                }
             });
         });
 
@@ -90,7 +95,7 @@ An error shown here means the server is not responding -->
             <i class="fa fa-bed" aria-hidden="true"></i> Retreat
         </button>
 
-        <button type="submit" class="btn btn-default" formmethod="post" formaction="/vote/byzantine">
+        <button id="byzantine-btn" type="submit" class="btn btn-default" formmethod="post" formaction="/vote/byzantine">
             <i class="fa fa-user-secret" aria-hidden="true"></i> Byzantine
         </button>
 
