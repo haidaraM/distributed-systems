@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <!--  for the browser to show the page in the correct encoding -->
     <meta charset="utf-8">
     <!--  to scale page width automatically -->
@@ -11,64 +11,86 @@
     <meta name="author" content="Beshr Al Nahas">
     <!-- Include the jQuery library. It is used to update the page contents automatically. -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"
+          integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
     <!-- Inlined javascript code. This could be optionally hosted in another file on the server and included using 'src' attribute as above -->
     <script>
-      var page_reload_timeout = 2; //in seconds
-      var page_reload_count = 0;
-      
-      function update_contents(){
-        page_reload_count += 1;
-        $("#vote_result_placeholder").load("/vote/result", function (data, status) {
-          //alert("Data: " + data + "\nStatus: " + status);
-          $("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
-        });
-      }
+        var page_reload_timeout = 5; //in seconds
+        var page_reload_count = 0;
 
-      function reload_countdown(remaining) {
-        $("#countdown_placeholder").text("Reloading page in: " + remaining + " seconds.");
-        if (remaining <= 0) {
-          remaining = page_reload_timeout;
-          update_contents();
+        function update_contents() {
+            page_reload_count += 1;
+            $("#vote_result_placeholder").load("/vote/result", function (data, status) {
+                //alert("Data: " + data + "\nStatus: " + status);
+                $("#boardcontents_status_placeholder").text(page_reload_count + ": " + status);
+            });
         }
 
-        setTimeout(function () {
-          reload_countdown(remaining - 1);
-        }, 1000);
-      }
+        function reload_countdown(remaining) {
+            $("#countdown_placeholder").text("Reloading page in: " + remaining + " seconds.");
+            if (remaining <= 0) {
+                remaining = page_reload_timeout;
+                update_contents();
+            }
 
-      $(document).ready(function () {
-        reload_countdown(page_reload_timeout);
-      });
+            setTimeout(function () {
+                reload_countdown(remaining - 1);
+            }, 1000);
+        }
+
+        $(document).ready(function () {
+            reload_countdown(page_reload_timeout);
+        });
     </script>
 
     <title>Byzantine Agreement - TDA596 (Chalmers)</title>
-  </head>
-  <body>
-    <!-- this place will show a count down for the automatic reload of the board contents, downloaded periodically from the server using the javascript function reload_countdown. -->
-    <div id="countdown_placeholder"></div>
-    <!-- This place shows the status of the auto-reload. 
+</head>
+<body class="container">
+<!-- this place will show a count down for the automatic reload of the board contents, downloaded periodically from the server using the javascript function reload_countdown. -->
+<div id="countdown_placeholder"></div>
+<!-- This place shows the status of the auto-reload.
 An error shown here means the server is not responding -->
-    <div id="boardcontents_status_placeholder">0: success</div>
+<div id="boardcontents_status_placeholder">0: success</div>
 
-    <!-- This is a target for forms to prevent reloading the page on form submit. USE style="display:none" to hide it -->
-    <iframe name="noreload-form-target" width="90%" height="50" src="about:blank" frameborder="0" scrolling="yes" resizable seamless></iframe>
+<!-- This is a target for forms to prevent reloading the page on form submit. We handle the update in the script instead. USE style="display:none" to hide it -->
+<iframe name="noreload-form-target" style="display:none" width="90%" height="50" src="about:blank" frameborder="0"
+        scrolling="yes" resizable seamless></iframe>
 
-    <!-- This place shows the buttons used to request a vote -->
-    <div id="vote_form_placeholder">
-      <h3>Vote</h3>
-      <form id="usrform" target="noreload-form-target">
-        <input type="submit" formmethod="post" formaction="/vote/attack" value="Attack" />
-        <input type="submit" formmethod="post" formaction="/vote/retreat" value="Retreat" />
-        <input type="submit" formmethod="post" formaction="/vote/byzantine" value="Byzantine" />
-      </form>
-    </div>
+<!-- This place shows the buttons used to request a vote -->
+<div id="vote_form_placeholder">
+    <h3>Vote</h3>
+    <form id="usrform" target="noreload-form-target">
+        <button type="submit" class="btn btn-danger" formmethod="post" formaction="/vote/attack">
+            <i class="fa fa-fire" aria-hidden="true"></i> Attack
+        </button>
 
-    <h3>Result</h3>
-    <button onclick="update_contents();">Refresh Vote Result</button>
+        <button type="submit" class="btn btn-primary" formmethod="post" formaction="/vote/retreat">
+            <i class="fa fa-bed" aria-hidden="true"></i> Retreat
+        </button>
 
-    <div id="vote_result_placeholder">
+        <button type="submit" class="btn btn-default" formmethod="post" formaction="/vote/byzantine">
+            <i class="fa fa-user-secret" aria-hidden="true"></i> Byzantine
+        </button>
+
+    </form>
+</div>
+
+<h3>Result</h3>
+<button class="btn btn-default" onclick="update_contents();">
+    <i class="fa fa-refresh" aria-hidden="true"></i>
+    Refresh Vote Result
+</button>
+
+<div id="vote_result_placeholder" style="padding-top: 10px">
     <pre>Voting Results ...</pre>
-    </div>
+</div>
 
-  </body>
+</body>
 </html>
