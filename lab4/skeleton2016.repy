@@ -181,7 +181,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
 
             # I can perform directly the round2 because I received all the votes
             perform_byzantine_round2()
-        else:  # I'm not a byzantine
+        else:
             # if I have received all the votes, I send my votes_vector to all the others vessels
             if nb_votes == len(mycontext['neighbors']):
                 msg_type = 'vector_votes'
@@ -190,6 +190,9 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
 
                 msg_to_send = msg_type + "\n" + str(votes) + "\n" + str(ips)
                 send_msg_to_neighbors(msg_to_send)
+
+                # we add our vector to the list of vectors of votes
+                mycontext['generals_votes'].append((mycontext['ip'], mycontext['votes_vector']))
 
     elif msg_type == 'vector_votes':
 
@@ -204,10 +207,16 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
         for vote in votes_vector:
             tmp.append((vote, ip_list[i]))
             i += 1
-        print tmp, "from", ip_address
-        mycontext['generals_votes'].append(tmp)
+
+        # print tmp, "from", ip_address
+
+        mycontext['generals_votes'].append((ip_address, tmp))
 
         mycontext['votes_vector_lock'].release()
+
+        if len(mycontext['generals_votes']) == len(mycontext['neighbors']):
+            # the voting
+            perform_voting()
 
     #
     res = make_http_response(200, 'OK', "Success")
@@ -260,6 +269,39 @@ def perform_byzantine_round2():
             i += 1
 
 
+def perform_voting():
+    """
+    Peform the actual voting
+    :return:
+    """
+
+    # we exclude certain votes now. These votes correspond to the diagonal or own vote for each vector
+    # (see lecture fault tolerance page 44)
+    mycontext['votes_vector_lock'].acquire()
+    # print "Length of vector before the voting:", len(mycontext['generals_votes'])
+    for sender_vector_tuple in mycontext['generals_votes']:
+        sender_ip = sender_vector_tuple[0]
+        votes_and_ip_list = sender_vector_tuple[1]
+
+        i = 0
+        for vote, voter_ip in votes_and_ip_list:
+            if voter_ip == sender_ip:
+                del votes_and_ip_list[i]
+                # we break the inner loop because only one vote in the list can have the same ip
+                break
+            i += 1
+
+    mycontext['votes_vector_lock'].release()
+
+    # print "Length of vector after the voting:", len(mycontext['generals_votes'])
+    # print "After voting", mycontext['generals_votes']
+
+    # majority voting
+    result_vector = []
+    for j in range(len(mycontext['neighbors'])):
+        pass
+
+
 def get_requests_handler(msgheader, sockobj, thiscommhandle):
     """
     Handles initial GET request from browser, outputs HTML string and closes socket.
@@ -280,7 +322,7 @@ def get_requests_handler(msgheader, sockobj, thiscommhandle):
         htmlresponse = generate_html_page()
     elif uri == "/vote/result":
         # TODO : return the result
-        #msg = "Voting Results ... %s " % mycontext['votes_vector']
+        # msg = "Voting Results ... %s " % mycontext['votes_vector']
         msg = "Votes %s - Vectors %s" % (mycontext['votes_vector'], mycontext['generals_votes'])
         htmlresponse = mycontext['vote_result_template'] % msg
     res = make_http_response(200, 'OK', htmlresponse)
@@ -464,7 +506,12 @@ def initialize_context(my_ip, my_port):
     # the votes of each general
     mycontext['votes_vector'] = []
 
-    # list of vectors of the generals' votes.
+    # the final result vector corresponding to the majority voting
+    mycontext['result_vector'] = []
+    mycontext['result'] = None
+
+    # list of vectors of the generals' votes. Each element of the list is as follow :
+    # (sender_ip, [(vote, voter_ip), (vote, voter_ip),...])
     mycontext['generals_votes'] = []
 
     mycontext['votes_vector_lock'] = getlock()
