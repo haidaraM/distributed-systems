@@ -160,7 +160,7 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
     msg_type = splitted_msg[0]
 
     if msg_type == "vote":
-        if splitted_msg[1] == "True":
+        if splitted_msg[1] == "True" or splitted_msg[1] == 'Attack':
             vote = True
         else:
             vote = False
@@ -168,11 +168,29 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
         mycontext['votes_vector'].append(vote)
         mycontext['votes_vector_lock'].release()
 
-        print "Nb votes : ", len(mycontext['votes_vector'])
+        # print "Nb votes : ", len(mycontext['votes_vector'])
+        nb_votes = len(mycontext['votes_vector'])
 
-    # if I am a byzantine, I check if all the loyal sent their vote and then I send a different vote to each
-    if i_am_a_byzantine() and mycontext['nb_loyal'] == len(mycontext['votes_vector']):
-        perform_byzantine_round1()
+        # if I am a byzantine, I check if all the loyal sent their vote and then I send a different vote to each
+        if i_am_a_byzantine() and mycontext['nb_loyal'] == nb_votes:
+            perform_byzantine_round1()
+
+            # I can perform directly the round2 because I received all the votes
+            perform_byzantine_round2()
+
+        # if I have received all the votes, I send my votes_vector to all the others vessels
+        if nb_votes == len(mycontext['neighbors']):
+            msg_type = 'vector_votes'
+            msg_to_send = msg_type + "\n" + str(mycontext['votes_vector'])
+            send_msg_to_neighbors(msg_to_send)
+
+    elif msg_type == 'vector_votes':
+        votes_vector = stringlist_to_boollist(splitted_msg[1])
+        print votes_vector, "from", ip_address
+
+        mycontext['votes_vector_lock'].acquire()
+        mycontext['generals_votes'].append(votes_vector)
+        mycontext['votes_vector_lock'].release()
 
     #
     res = make_http_response(200, 'OK', "Success")
@@ -182,12 +200,12 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
 
 def perform_byzantine_round1():
     """
-    Perform the round 1 of the byzantine job by sending different votes to each general
+    Perform the round 1 of the byzantine job by sending different vote to each general
     :return:
     """
     round1_vector = compute_byzantine_vote_round1(mycontext['nb_loyal'], len(mycontext['neighbors']),
                                                   mycontext['on_tie'])
-    print round1_vector
+    # print round1_vector
 
     # forward the message to the honest nodes
     i = 0
@@ -198,6 +216,29 @@ def perform_byzantine_round1():
 
         if mycontext['ip'] != neighbor_ip_address:
             msg_to_send = msg_type + "\n" + str(round1_vector[i])
+            send_msg_to_neighbor(msg_to_send, neighbor_ip_address, mycontext['port'])
+            i += 1
+
+
+def perform_byzantine_round2():
+    """
+    Perform the round 2 of the byzantine job by sending different vector to each general
+    :return:
+    """
+    round2_vector = compute_byzantine_vote_round2(mycontext['nb_loyal'], len(mycontext['neighbors']),
+                                                  mycontext['on_tie'])
+
+    # print "round 2 vector", round2_vector
+
+    # forward the message to the honest nodes
+    i = 0
+
+    for neighbor_ip_address in mycontext['neighbors']:
+
+        msg_type = "vector_votes"
+
+        if mycontext['ip'] != neighbor_ip_address:
+            msg_to_send = msg_type + "\n" + str(round2_vector[i])
             send_msg_to_neighbor(msg_to_send, neighbor_ip_address, mycontext['port'])
             i += 1
 
@@ -234,7 +275,6 @@ def generate_html_page():
     Return the html page to display
     :return:
     """
-
     return mycontext['vote_frontpage_template']
 
 
@@ -290,16 +330,37 @@ def extract_parameters_from_query(msg):
     return parameters
 
 
+def stringlist_to_boollist(stringlist):
+    """
+    Utility function to transform the representation of a list of booleans to a real list of booleans for example
+    '[True, True, True, True]' => [True, True, True, True] or ['Attack', 'Retreat'] => [True, False]
+    :param stringlist:
+    :return:
+    """
+    tmp = stringlist.replace("[", "").replace("]", "").split(",")
+    tmp = [x.strip() for x in tmp]
+    result = []
+
+    for bool_string in tmp:
+        if bool_string == "True" or bool_string == "Attack":
+            result.append(True)
+        else:
+            result.append(False)
+
+    return result
+
+
 def send_msg_to_neighbors(msg_to_send):
     """
     Send a msg to the neighbors.
     The messages sent have the following schema:
 
     msgtype
-    [the_vote]
+    [content]
 
-    The msgtype can be : 'vote', ... . If 'vote', the second line should the vote i.e. True for 'Attack' or False for
-    'Retreat'.
+    The msgtype can be : 'vote', 'vector_votes' . If 'vote', the second line should be the vote i.e. True for 'Attack'
+    or False for 'Retreat'.
+    If msgtype is 'vector_votes', the second line should be the votes this vessel received i.e. [True, False, True,...]
 
     :param msg_to_send the message to send
     :return:
@@ -321,7 +382,7 @@ def send_msg_to_neighbors(msg_to_send):
 
 def send_msg_to_neighbor(msg_to_send, neighbor_ip_address, port_number):
     """
-    Sends a message to a specific neighbor
+    Sends a message to a specific neighbor. The message has the same format as in :func:send_msg_to_neighbors
     :param port_number:
     :param msg_to_send:
     :param neighbor_ip_address:
@@ -363,8 +424,11 @@ def initialize_context(my_ip, my_port):
     # boolean to indicate if this general (vessel) if byzantine or not
     mycontext['byzantine'] = False
 
-    # stock the vote of each general
+    # the votes of each general
     mycontext['votes_vector'] = []
+
+    # list of vectors of the generals' votes.
+    mycontext['generals_votes'] = []
 
     mycontext['votes_vector_lock'] = getlock()
 
