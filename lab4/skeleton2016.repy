@@ -147,6 +147,14 @@ def i_am_a_byzantine():
 
 
 def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
+    """
+    Called when we have received a msg from a neighbor
+    :param msgheader:
+    :param sockobj:
+    :param thiscommhandle:
+    :param ip_address:
+    :return:
+    """
     splitted_msg = msgheader.split("\n")
 
     msg_type = splitted_msg[0]
@@ -160,10 +168,38 @@ def got_msg_from_neighbor(msgheader, sockobj, thiscommhandle, ip_address):
         mycontext['votes_vector'].append(vote)
         mycontext['votes_vector_lock'].release()
 
+        print "Nb votes : ", len(mycontext['votes_vector'])
+
+    # if I am a byzantine, I check if all the loyal sent their vote and then I send a different vote to each
+    if i_am_a_byzantine() and mycontext['nb_loyal'] == len(mycontext['votes_vector']):
+        perform_byzantine_round1()
+
+    #
     res = make_http_response(200, 'OK', "Success")
     sockobj.send(res)
-
     stopcomm(thiscommhandle)
+
+
+def perform_byzantine_round1():
+    """
+    Perform the round 1 of the byzantine job by sending different votes to each general
+    :return:
+    """
+    round1_vector = compute_byzantine_vote_round1(mycontext['nb_loyal'], len(mycontext['neighbors']),
+                                                  mycontext['on_tie'])
+    print round1_vector
+
+    # forward the message to the honest nodes
+    i = 0
+
+    for neighbor_ip_address in mycontext['neighbors']:
+
+        msg_type = "vote"
+
+        if mycontext['ip'] != neighbor_ip_address:
+            msg_to_send = msg_type + "\n" + str(round1_vector[i])
+            send_msg_to_neighbor(msg_to_send, neighbor_ip_address, mycontext['port'])
+            i += 1
 
 
 def get_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -283,6 +319,23 @@ def send_msg_to_neighbors(msg_to_send):
                 print str(exception)
 
 
+def send_msg_to_neighbor(msg_to_send, neighbor_ip_address, port_number):
+    """
+    Sends a message to a specific neighbor
+    :param port_number:
+    :param msg_to_send:
+    :param neighbor_ip_address:
+    :return:
+    """
+    try:
+        sockojb = openconn(neighbor_ip_address, port_number)
+        sockojb.send(msg_to_send)
+        sockojb.close()
+
+    except Exception, exception:
+        print str(exception)
+
+
 def initialize_context(my_ip, my_port):
     """
     Initializes the context by putting the necessary variables in the mycontext
@@ -304,6 +357,9 @@ def initialize_context(my_ip, my_port):
     for line in file("neighborlist.txt", "r"):
         mycontext['neighbors'].append(line.strip())
 
+    # number of loyal (honest) nodes
+    mycontext['nb_loyal'] = 3
+
     # boolean to indicate if this general (vessel) if byzantine or not
     mycontext['byzantine'] = False
 
@@ -311,6 +367,9 @@ def initialize_context(my_ip, my_port):
     mycontext['votes_vector'] = []
 
     mycontext['votes_vector_lock'] = getlock()
+
+    # on tie rule. True for attack, False for retreat
+    mycontext['on_tie'] = True
 
     mycontext['authors'] = '<a href="mailto:mouctar@student.chalmers.se">mouctar@student.chalmers.se</a> and ' \
                            '<a href="mailto:francine@student.chalmers.se">francine@student.chalmers.se</a>'
