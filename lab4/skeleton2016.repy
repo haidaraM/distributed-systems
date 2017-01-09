@@ -294,12 +294,32 @@ def perform_voting():
     mycontext['votes_vector_lock'].release()
 
     # print "Length of vector after the voting:", len(mycontext['generals_votes'])
-    # print "After voting", mycontext['generals_votes']
+    print "After voting", mycontext['generals_votes']
 
     # majority voting
     result_vector = []
-    for j in range(len(mycontext['neighbors'])):
-        pass
+    for j in range(len(mycontext['neighbors']) - 1):
+        nb_attacks = 0
+        nb_retreats = 0
+
+        for k in range(len(mycontext['neighbors'])):
+            votes_vector = mycontext['generals_votes'][k][1]  # => [(vote, ip), (vote, ip), ...]
+            print votes_vector
+            vote = votes_vector[j][0]  # we get the vote (first element of the tuple)
+
+            if vote:
+                nb_attacks += 1
+            else:
+                nb_retreats += 1
+
+        if nb_retreats == nb_attacks:
+            result_vector.append(mycontext['on_tie'])
+        elif nb_retreats > nb_attacks:
+            result_vector.append(False)
+        else:
+            result_vector.append(True)
+
+    print "Final result", result_vector
 
 
 def get_requests_handler(msgheader, sockobj, thiscommhandle):
