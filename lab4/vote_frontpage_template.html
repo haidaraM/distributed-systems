@@ -22,8 +22,9 @@
 
     <!-- Inlined javascript code. This could be optionally hosted in another file on the server and included using 'src' attribute as above -->
     <script>
-        var page_reload_timeout = 3; //in seconds
+        var page_reload_timeout = 10000000; //in seconds
         var page_reload_count = 0;
+        var timeout;
 
         function update_contents() {
             page_reload_count += 1;
@@ -40,7 +41,7 @@
                 update_contents();
             }
 
-            setTimeout(function () {
+            timeout = setTimeout(function () {
                 reload_countdown(remaining - 1);
             }, 1000);
         }
@@ -109,7 +110,7 @@ An error shown here means the server is not responding -->
 </button>
 
 <div id="vote_result_placeholder" style="padding-top: 10px">
-    <pre>Voting Results ...</pre>
+    <pre>Votes []  - Vectors []</pre>
 </div>
 
 </body>
