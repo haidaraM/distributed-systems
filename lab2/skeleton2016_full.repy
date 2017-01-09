@@ -1,7 +1,9 @@
 # ------------------------------------------------------------------------------
 # Start listening and handle incoming connections in board() function
 # ------------------------------------------------------------------------------
-#begin include election.repy
+# begin include election.repy
+
+
 def send_election_message(neighbor_address, message, append=True):
     """
     Send an election message the neighbor_address
@@ -24,7 +26,7 @@ def send_election_message(neighbor_address, message, append=True):
 
             sockobj = openconn(neighbor_address, mycontext['port'])
 
-            #print mycontext['ip'], "sending message to", neighbor_address
+            # print mycontext['ip'], "sending message to", neighbor_address
 
             sockobj.send(new_msg)
 
@@ -69,7 +71,7 @@ def process_election_message(message):
             neighbor_ids.append(int(neighbor_id))
             neighbor_ips.append(neighbor_ip)
 
-    #print "Election message received. Neighbors ids : %s. Ip addresses : %s" % (neighbor_ids, neighbor_ips)
+    # print "Election message received. Neighbors ids : %s. Ip addresses : %s" % (neighbor_ids, neighbor_ips)
 
     if neighbor_ids[0] == mycontext['my_id']:  # if the first id is mine, the ring is done
 
@@ -79,7 +81,7 @@ def process_election_message(message):
         # This part is critical because it can be accessed by multiple threads at the same time
         leader_id = max(neighbor_ids)
         leader_ip = neighbor_ips[neighbor_ids.index(leader_id)]
-        #print "The id of the leader is %d with ip %s" % (leader_id, leader_ip)
+        # print "The id of the leader is %d with ip %s" % (leader_id, leader_ip)
         mycontext['leader_lock'].acquire()
         mycontext['leader_id'] = leader_id
         mycontext['leader_ip'] = leader_ip
@@ -106,7 +108,8 @@ def get_next_vessel_to(adresse_ip):
     else:
         return neighbor_list[my_index + 1]
 
-#end include election.repy
+
+# end include election.repy
 
 
 def start_board():
@@ -184,6 +187,7 @@ def modify_entry(entry_id, entry):
         mycontext['entries'][entry_id] = entry
     else:
         print "Tried to delete an entry that doesn't exist"
+
 
 def _entry_key(entry_key):
     """
@@ -345,7 +349,7 @@ def post_requests_handler(msgheader, sockobj, thiscommhandle, ip_source):
         stopcomm(thiscommhandle)
 
     elif uri == "/from_leader":  # a non leader has received a message from the leader
-        #print "received message from leader"
+        # print "received message from leader"
         operation = parameters["operation"]
         entry_id = parameters['entry_id']
 
@@ -453,7 +457,6 @@ def get_entries_in_html():
     :return: a string representing all the entries
     """
     output = ""
-
 
     key_list = mycontext['entries'].keys()
     key_list.sort(key=_entry_key)
@@ -608,4 +611,3 @@ if callfunc == 'initialize':
     # wait a couple of secondes before starting the election
     mycontext['election_timer'] = settimer(10, begin_election, ())
     # begin_election()
-

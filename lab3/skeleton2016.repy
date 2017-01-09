@@ -191,7 +191,7 @@ def delete_entry(entry_sequence_number, entry_creator_ip):
 
 def modify_entry(entry_sequence_number, entry_creator_ip, entry_text, message_sequence_number, message_creator_ip):
     """
-    Modify an entry. The modification is done only the message sequence number is > to the sequence number of the
+    Modify an entry. The modification is done only if the message sequence number is > to the sequence number of the
     last message that modified the entry
     :param message_creator_ip:
     :param message_sequence_number:
@@ -254,6 +254,7 @@ def apply_pending_deletes(entry_sequence_number, entry_creator_ip):
     counter = 0
     for eventual_update in mycontext['history']:
         if eventual_update.update_type == "delete":
+
             if eventual_update.entry_creator_ip == entry_creator_ip and eventual_update.entry_sequence_number == entry_sequence_number:
                 # we delete the entry and the eventual update
                 delete_entry(entry_sequence_number, entry_creator_ip)
