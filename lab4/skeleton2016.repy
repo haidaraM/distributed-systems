@@ -269,6 +269,15 @@ def perform_byzantine_round2():
             i += 1
 
 
+def sort_key(t):
+    """
+
+    :param t: (sender_ip, [(vote, ip),...]
+    :return:
+    """
+    return t[0]
+
+
 def perform_voting():
     """
     Peform the actual voting
@@ -279,38 +288,40 @@ def perform_voting():
     # (see lecture fault tolerance page 44)
     mycontext['votes_vector_lock'].acquire()
     # print "Length of vector before the voting:", len(mycontext['generals_votes'])
-    for sender_vector_tuple in mycontext['generals_votes']:
-        sender_ip = sender_vector_tuple[0]
-        votes_and_ip_list = sender_vector_tuple[1]
-
-        i = 0
-        for vote, voter_ip in votes_and_ip_list:
-            if voter_ip == sender_ip:
-                del votes_and_ip_list[i]
-                # we break the inner loop because only one vote in the list can have the same ip
-                break
-            i += 1
+    # for sender_vector_tuple in mycontext['generals_votes']:
+    #     sender_ip = sender_vector_tuple[0]
+    #     votes_and_ip_list = sender_vector_tuple[1]
+    #
+    #     i = 0
+    #     for vote, voter_ip in votes_and_ip_list:
+    #         if voter_ip == sender_ip:
+    #             del votes_and_ip_list[i]
+    #             # we break the inner loop because only one vote in the list can have the same ip
+    #             break
+    #         i += 1
 
     mycontext['votes_vector_lock'].release()
 
     # print "Length of vector after the voting:", len(mycontext['generals_votes'])
+    mycontext['generals_votes'].sort(key=sort_key)
     print "After voting", mycontext['generals_votes']
 
     # majority voting
     result_vector = []
-    for j in range(len(mycontext['neighbors']) - 1):
+    for j in range(len(mycontext['neighbors'])):
         nb_attacks = 0
         nb_retreats = 0
 
         for k in range(len(mycontext['neighbors'])):
-            votes_vector = mycontext['generals_votes'][k][1]  # => [(vote, ip), (vote, ip), ...]
-            print votes_vector
-            vote = votes_vector[j][0]  # we get the vote (first element of the tuple)
+            sender_ip, votes_vector = mycontext['generals_votes'][k]  # => sender_ip, [(vote, ip), (vote, ip), ...]
 
-            if vote:
-                nb_attacks += 1
-            else:
-                nb_retreats += 1
+            vote = votes_vector[j][0]  # we get the vote (first element of the tuple)
+            voter_ip = votes_vector[j][1]
+            if voter_ip != sender_ip:
+                if vote:
+                    nb_attacks += 1
+                else:
+                    nb_retreats += 1
 
         if nb_retreats == nb_attacks:
             result_vector.append(mycontext['on_tie'])
@@ -320,6 +331,7 @@ def perform_voting():
             result_vector.append(True)
 
     print "Final result", result_vector
+    mycontext['result_vector'] = result_vector
 
 
 def get_requests_handler(msgheader, sockobj, thiscommhandle):
@@ -343,7 +355,7 @@ def get_requests_handler(msgheader, sockobj, thiscommhandle):
     elif uri == "/vote/result":
         # TODO : return the result
         # msg = "Voting Results ... %s " % mycontext['votes_vector']
-        msg = "Votes %s - Vectors %s" % (mycontext['votes_vector'], mycontext['generals_votes'])
+        msg = "Result vector %s" % (mycontext['result_vector'])
         htmlresponse = mycontext['vote_result_template'] % msg
     res = make_http_response(200, 'OK', htmlresponse)
     sockobj.send(res)
